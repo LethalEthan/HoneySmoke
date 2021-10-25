@@ -19,10 +19,10 @@ func (P *ProxyObject) ProxyBackEnd() {
 			Log.Debug("Connected handling...")
 			break
 		} else {
-			Log.Critical("Error dialing, waiting 3 seconds until retry")
+			Log.Critical("Error dialing, waiting ", config.GConfig.Performance.CheckServerSeconds, " seconds until retry")
 			err = nil //reset err otherwise it could just loop
 		}
-		time.Sleep(3 * time.Second)
+		time.Sleep(time.Duration(config.GConfig.Performance.CheckServerSeconds) * time.Second)
 	}
 	go P.HandleFrontEnd()
 	go P.HandleBackEnd()
@@ -93,7 +93,7 @@ func (P *ProxyObject) HandleBackEnd() {
 					P.SetReconnection(true)
 					goto start //Continue from here
 				} else {
-					Log.Critical("Error dialing, waiting 3 seconds until retry")
+					Log.Critical("Error dialing, waiting ", config.GConfig.Performance.CheckServerSeconds, " seconds until retry")
 				}
 				if GetLimbo() {
 					if P.GetCompression() > 0 {
@@ -111,7 +111,7 @@ func (P *ProxyObject) HandleBackEnd() {
 					}
 					Log.Debug("Sent server limbo keepalive")
 				}
-				time.Sleep(3 * time.Second)
+				time.Sleep(time.Duration(config.GConfig.Performance.CheckServerSeconds) * time.Second)
 			}
 		}
 		err = nil

@@ -38,6 +38,7 @@ type Config struct {
 		PacketsPerSecond          int  `yaml:"packets-per-second"`    //TBD
 		ApplyStrictMovementChecks bool `yaml:"movement-checks"`       //TBD
 		LimboMode                 bool `yaml:"limbo-mode-when-backend-down"`
+		CheckServerSeconds        int  `yaml:"check-server-seconds"`
 	} `yaml:"performance"`
 }
 

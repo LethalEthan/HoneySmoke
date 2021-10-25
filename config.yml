@@ -15,3 +15,4 @@ performance: #Change me!
    packets-per-second: 0 #TBD
    movement-checks: false #TBD
    limbo-mode-when-backend-down: false #TBD
+   check-server-seconds: 1 #Change this one for connecting to the backend server
