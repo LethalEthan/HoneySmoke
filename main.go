@@ -25,5 +25,5 @@ func main() {
 	Log.Info("HoneySmoke" /*utils.GetVersionString()*/, "0.0.0.1", "starting...")
 	Log.Warning("HoneySmoke is in alpha! It is not complete and has many left overs and debugging statements left!")
 	conf := config.ConfigStart()
-	proxy.ProxyFrontEnd(conf.ProxyServer.IP, conf.ProxyServer.Port)
+	proxy.ProxyListener(conf.ProxyServer.IP, conf.ProxyServer.Port)
 }

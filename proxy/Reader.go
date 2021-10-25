@@ -7,12 +7,14 @@ import (
 	"io"
 	"math"
 	"strconv"
+
+	"github.com/google/uuid"
 )
 
 type PacketReader struct {
 	Data   []byte
-	Seeker int64
-	End    int64
+	Seeker int32
+	End    int32
 }
 
 //CreatePacketReader - Creates Packet Reader
@@ -20,12 +22,12 @@ func CreatePacketReader(Data []byte) *PacketReader {
 	pr := new(PacketReader)
 	pr.Data = Data
 	pr.Seeker = 0
-	pr.End = int64(len(Data))
+	pr.End = int32(len(Data))
 	return pr
 }
 
 //Seek - Seek through the Data array
-func (pr *PacketReader) Seek(offset int64) (int64, error) {
+func (pr *PacketReader) Seek(offset int32) (int32, error) {
 	pr.Seeker += offset
 	return pr.Seeker, nil
 }
@@ -33,10 +35,10 @@ func (pr *PacketReader) Seek(offset int64) (int64, error) {
 func (pr *PacketReader) SetData(data []byte) {
 	pr.Seeker = 0
 	pr.Data = data
-	pr.End = int64(len(data))
+	pr.End = int32(len(data))
 }
 
-func (pr *PacketReader) SeekTo(pos int64) bool {
+func (pr *PacketReader) SeekTo(pos int32) bool {
 	if pos > pr.End {
 		return false
 	}
@@ -53,7 +55,7 @@ func (pr *PacketReader) CheckIfEnd() bool {
 	return pr.Seeker == pr.End
 }
 
-func (pr *PacketReader) CheckForEOFWithSeek(SeekTo int64) bool {
+func (pr *PacketReader) CheckForEOFWithSeek(SeekTo int32) bool {
 	if pr.Seeker > pr.End {
 		return true
 	}
@@ -64,7 +66,7 @@ func (pr *PacketReader) CheckForEOFWithSeek(SeekTo int64) bool {
 }
 
 //whence is where the current Seek is and offset is how far the Seek should offset to
-func (pr *PacketReader) SeekWithEOF(offset int64) (int64, error) {
+func (pr *PacketReader) SeekWithEOF(offset int32) (int32, error) {
 	if offset+pr.Seeker > pr.End {
 		return offset, errors.New("Seek reached End")
 	}
@@ -94,9 +96,9 @@ func (pr *PacketReader) ReadBoolean() (bool, error) {
 }
 
 //ReadByte - reads a single byte from the packet and returns it, it returns a zero and an io.EOF if the packet has been already read to the End.
-func (pr *PacketReader) ReadByte() (byte, error) {
+func (pr *PacketReader) ReadByte() (int8, error) {
 	Byte, err := pr.ReadUnsignedByte()
-	return Byte, err
+	return int8(Byte), err
 }
 
 func (pr *PacketReader) ReadUnsignedByte() (byte, error) {
@@ -189,6 +191,22 @@ func (pr *PacketReader) ReadDouble() (float64, error) {
 	return math.Float64frombits(uint64(doubleBits)), nil
 }
 
+func (pr *PacketReader) ReadUUID() (uuid.UUID, error) {
+	if pr.CheckForEOFWithSeek(16) {
+		return uuid.Nil, io.EOF
+	}
+	UUIDBytes := pr.Data[pr.Seeker : pr.Seeker+16]
+	_, err := pr.SeekWithEOF(16)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	UUID, err := uuid.FromBytes(UUIDBytes)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return UUID, err
+}
+
 func (pr *PacketReader) ReadString() (string, error) {
 	if pr.CheckForEOF() {
 		return "", errors.New("error on begin start string")
@@ -202,19 +220,19 @@ func (pr *PacketReader) ReadString() (string, error) {
 		return "", io.EOF
 	}
 	//StringSize check
-	if StringSize < 0 {
+	if StringSize <= 0 {
 		return "", errors.New("string size of %d invalid" + strconv.Itoa(int(StringSize)))
 	}
-	if int64(StringSize) > pr.End {
-		return "", errors.New("StringSize exceeds EOF")
+	if StringSize > pr.End {
+		return "", errors.New("StringSize exceeds EOF, size: " + strconv.Itoa(int(StringSize)) + "Packet size: " + strconv.Itoa(len(pr.Data)))
 	}
-	if int64(StringSize)+pr.Seeker > pr.End {
+	if StringSize+pr.Seeker > pr.End {
 		return "", errors.New("string size + seeker = EOF")
 	}
 	//Read the string
-	StringVal := string(pr.Data[pr.Seeker : pr.Seeker+int64(StringSize)])
+	StringVal := string(pr.Data[pr.Seeker : pr.Seeker+int32(StringSize)])
 	//move the Seek
-	_, err = pr.SeekWithEOF(int64(StringSize))
+	_, err = pr.SeekWithEOF(int32(StringSize))
 	if err != nil {
 		return StringVal, err
 	}
@@ -222,22 +240,16 @@ func (pr *PacketReader) ReadString() (string, error) {
 }
 
 func (pr *PacketReader) ReadVarInt() (int32, byte, error) {
-	// if pr.CheckForEOF() {
-	// 	return 0, 0, errors.New("EOF: ReadVarInt")
-	// }
 	var Result uint32
+	var val uint32
 	var NumRead byte
 	var Byte byte
-	var val uint32
 	var err error
 	Byte, err = pr.ReadUnsignedByte()
 	if err != nil {
 		return 0, 0, err
 	}
 	for {
-		if err != nil {
-			return int32(Result), NumRead, err
-		}
 		val = uint32((Byte & 0x7F))
 		Result |= (val << (7 * NumRead))
 		//Increment
@@ -251,18 +263,18 @@ func (pr *PacketReader) ReadVarInt() (int32, byte, error) {
 			break
 		}
 		Byte, err = pr.ReadUnsignedByte()
+		if err != nil {
+			return 0, 0, err //int32(Result), NumRead, err
+		}
 	}
 	return int32(Result), NumRead, nil
 }
 
 func (pr *PacketReader) ReadVarLong() (int64, error) {
-	//if pr.CheckForEOF() {
-	//	return 0, errors.New("EOF: ReadVarLong")
-	//}
 	var Result int64
-	var NumRead uint64
-	var Byte byte
 	var val int64
+	var Byte byte
+	var NumRead byte
 	var err error
 	Byte, err = pr.ReadUnsignedByte()
 	if err != nil {
@@ -286,7 +298,7 @@ func (pr *PacketReader) ReadVarLong() (int64, error) {
 		}
 		Byte, err = pr.ReadUnsignedByte()
 	}
-	_, err = pr.SeekWithEOF(int64(NumRead))
+	_, err = pr.SeekWithEOF(int32(NumRead))
 	if err != nil {
 		return Result, err
 	}
@@ -296,9 +308,9 @@ func (pr *PacketReader) ReadVarLong() (int64, error) {
 //ReadArray - Returns the array (slice) of the packet Data
 func (pr *PacketReader) ReadByteArray(length int32) ([]byte, error) {
 	fmt.Print("Current: ", pr.Seeker, "len: ", length)
-	Data := pr.Data[pr.Seeker : pr.Seeker+int64(length)]
+	Data := pr.Data[pr.Seeker : pr.Seeker+int32(length)]
 	fmt.Print("Datalen: ", len(Data))
-	pr.SeekWithEOF(int64(length))
+	pr.SeekWithEOF(int32(length))
 	fmt.Println("seeker: ", pr.Seeker)
 	return Data, nil
 }

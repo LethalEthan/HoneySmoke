@@ -3,6 +3,8 @@ package proxy
 import (
 	"encoding/binary"
 	"math"
+
+	"github.com/google/uuid"
 )
 
 type PacketWriter struct {
@@ -36,6 +38,19 @@ func CreatePacketWriterWithCapacity(PacketID int32, Capacity int) *PacketWriter 
 	return pw
 }
 
+func (pw *PacketWriter) GetCompressedPacket() []byte {
+	pw.packetSize = len(pw.data) //Set packet length
+	if pw.packetSize < 256 {
+		p := append(pw.CreateVarInt(uint32(pw.packetSize+1)), 0x00)
+		p = append(p, pw.data...)
+		return p
+	} else {
+		panic("PacketSize is bigger than 256")
+	}
+	// Log.Debug("PacketSize: ", len(pw.data))
+	// Log.Debug("Packet Contents: ", pw.data)
+}
+
 func (pw *PacketWriter) GetData() []byte {
 	return pw.data
 }
@@ -44,13 +59,15 @@ func (pw *PacketWriter) ResetData(packetID int32) {
 	pw.data = make([]byte, 0, len(pw.data))
 	pw.packetSize = 0
 	pw.packetID = packetID
+	pw.WriteVarInt(packetID)
 }
 
 func (pw *PacketWriter) GetPacket() []byte {
 	pw.packetSize = len(pw.data)
+	//pw.data = append(pw.CreateVarInt(uint32(pw.packetID)), pw.data...)
 	p := append(pw.CreateVarInt(uint32(pw.packetSize)), pw.data...)
-	Log.Debug("PacketSize: ", len(pw.data))
-	Log.Debug("Packet Contents: ", pw.data)
+	// Log.Debug("PacketSize: ", len(pw.data))
+	// Log.Debug("Packet Contents: ", pw.data)
 	return p
 }
 
@@ -134,6 +151,14 @@ func (pw *PacketWriter) WriteFloat(val float32) {
 //WriteDouble - Write Double to packet (float64)
 func (pw *PacketWriter) WriteDouble(val float64) {
 	pw.writeUnsignedLong(math.Float64bits(val))
+}
+
+func (pw *PacketWriter) WriteUUID(val uuid.UUID) {
+	BU, err := val.MarshalBinary()
+	if err != nil {
+		Log.Debug("Could not marshal UUID!")
+	}
+	pw.AppendByteSlice(BU)
 }
 
 //WriteArray - Write an array of bytes ([]byte)

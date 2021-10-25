@@ -1,9 +1,82 @@
 package proxy
 
 import (
+	"bytes"
+	"compress/zlib"
 	"fmt"
+	"io/ioutil"
 	"net"
 )
+
+func (P *ProxyObject) HandlePacketHeader(PR *PacketReader) (int32, int32, int32, []byte, error) {
+	var PacketSize int32
+	var DataLength int32
+	var PacketID int32
+	//Read packet size
+	PacketSize, _, err := PR.ReadVarInt()
+	if err != nil {
+		Log.Critical("Could not read packet size!")
+	}
+	//If compression is set
+	if P.GetCompression() > 0 {
+		//Data length is uncompressed length of packetID and data
+		DataLength, _, err = PR.ReadVarInt()
+		if err != nil {
+			Log.Debug("Could not read Data Length!", err)
+			P.Close()
+			return 0, 0, 0, []byte{0}, err
+		}
+		if DataLength > 0 {
+			//Read the compressed packet into byte reader
+			ByteReader := bytes.NewReader(PR.ReadRestOfByteArray())
+			//New zlib reader
+			ZlibReader, err := zlib.NewReader(ByteReader)
+			if err != nil {
+				return 0, 0, 0, []byte{0}, err
+			}
+			//Read decompressed packet
+			DecompressedPacket, err := ioutil.ReadAll(ZlibReader)
+			if err != nil {
+				return 0, 0, 0, []byte{0}, err
+			}
+			//Close ZlibReader
+			ZlibReader.Close()
+			//Check if size is correct
+			if len(DecompressedPacket) != int(DataLength) {
+				Log.Debug("Data length != bytes read")
+			}
+			//Set PacketReader to the decompressed packet
+			PR.SetData(DecompressedPacket)
+			//Read Packet ID
+			PacketID, _, err = PR.ReadVarInt()
+			if err != nil {
+				Log.Debug("Could not read PacketID!", err)
+				P.Close()
+				return 0, 0, 0, []byte{0}, err
+			}
+			return PacketSize, DataLength, PacketID, PR.ReadRestOfByteArray(), err
+		}
+		if DataLength == 0 {
+			//Not-compressed but compression is used and is below the threshold
+			PacketID, _, err = PR.ReadVarInt()
+			if err != nil {
+				Log.Debug("Could not read PacketID!", err)
+				P.Close()
+				return 0, 0, 0, []byte{0}, err
+			}
+			return PacketSize, DataLength, PacketID, PR.ReadRestOfByteArray(), err
+		}
+	} else { //No compression
+		PacketID, _, err = PR.ReadVarInt()
+		if err != nil {
+			Log.Debug("Could not read PacketID!", err)
+			P.Close()
+			return 0, 0, 0, []byte{0}, err
+		}
+		return PacketSize, 0, PacketID, PR.ReadRestOfByteArray(), nil
+	}
+	return PacketSize, DataLength, PacketID, PR.ReadRestOfByteArray(), nil
+}
 
 func ReadPacket(Conn net.Conn) (int32, int32, []byte, error) {
 	PacketSize, PSS, err := ParseVarIntFromConnection(Conn)
