@@ -1,7 +1,7 @@
 proxy-server:
   host: "127.0.0.1"
   port: ":25565"
-  debug: true #Doesn't do anything rn
+  debug: false
   timeout: 15 #Doesn't do anything rn
   protocol:
     AvailableProtocols: [] #Doesn't do anything rn
@@ -9,7 +9,7 @@ server:
   ip: "127.0.0.1"
   port: ":25567"
 performance: #Change me!
-   cpu: 8
+   cpu: 0 #0 = all cores
    gc-percent: 100 #Not implemented
    check-server-per-tick: 20 #TBD
    packets-per-second: 0 #TBD

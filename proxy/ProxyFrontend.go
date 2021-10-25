@@ -15,7 +15,7 @@ func (P *ProxyObject) HandleFrontEnd() {
 		err = nil
 		BytesRead, err = P.ClientConn.Read(data)
 		if err != nil {
-			Log.Critical("Closing Frontend: ", err, "DATA: ", PR.Data)
+			Log.Warning("Closing Frontend: ", err)
 			P.Close()
 			return
 		}
@@ -41,7 +41,7 @@ func (P *ProxyObject) HandleFrontEnd() {
 					P.Close()
 					return
 				}
-				Log.Info("PV: ", P.ProtocolVersion)
+				Log.Debug("PV: ", P.ProtocolVersion)
 				if P.ServerAddress, err = PR.ReadString(); err != nil {
 					Log.Error(err)
 					P.Close()
@@ -78,6 +78,9 @@ func (P *ProxyObject) HandleFrontEnd() {
 			switch PacketID {
 			case 0x00:
 				Log.Debug("Recieved Status 0x00 SB")
+				P.ClientConn.Write(PR.Data)
+				P.Close()
+				return
 			case 0x01:
 				Log.Debug("Recieved Status 0x01 SB")
 			}

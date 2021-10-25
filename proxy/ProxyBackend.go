@@ -46,9 +46,9 @@ func (P *ProxyObject) HandleBackEnd() {
 	start:
 		err = nil
 		BytesRead, err = P.ServerConn.Read(data)
-		if err != nil {
-			Log.Critical("Server connection lost! ", err)
-			Log.Critical("Limbo active")
+		if err != nil && P.ClientConn != nil {
+			Log.Warning("Server connection lost unexpectedly! ", err)
+			Log.Warning("Limbo active")
 			SetLimbo(true)
 			//Create keepalive packer
 			KP := CreatePacketWriterWithCapacity(0x21, 18)
@@ -63,7 +63,7 @@ func (P *ProxyObject) HandleBackEnd() {
 				//time.Sleep(4 * time.Second)
 				P.ServerConn, err = net.Dial("tcp", config.GConfig.Server.IP+config.GConfig.Server.Port)
 				if err == nil { //Can connect
-					Log.Debug("Reconnecting...")
+					Log.Info("Reconnecting...")
 					SetLimbo(false)
 					//Handshake
 					//P.SetState(HANDSHAKE)
@@ -124,7 +124,7 @@ func (P *ProxyObject) HandleBackEnd() {
 		//Read packet size
 		PacketSize, _, err = PR.ReadVarInt()
 		if err != nil {
-			Log.Critical("Could not read packet size!")
+			Log.Critical("Could not read packet size! ", err)
 		}
 		_ = PacketSize
 		//If compression is set
@@ -241,11 +241,8 @@ func (P *ProxyObject) HandleBackEnd() {
 			case 0x21:
 				Log.Debug("Sending Keepalive CB 0x21")
 			case 0x26:
-				if P.GetReconnection() {
-					Log.Debug("Sending Join Game - RCN")
-					//P.ClientConn.Write(PR.Data)
-					//Reconnect = false
-					Log.Debug("Passed through join game")
+				if config.GConfig.ProxyServer.DEBUG {
+					Log.Debug("Sending JoinGame 0x26")
 				}
 			case 0x32:
 				if P.Reconnection {
