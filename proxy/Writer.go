@@ -153,14 +153,6 @@ func (pw *PacketWriter) WriteDouble(val float64) {
 	pw.writeUnsignedLong(math.Float64bits(val))
 }
 
-func (pw *PacketWriter) WriteUUID(val uuid.UUID) {
-	BU, err := val.MarshalBinary()
-	if err != nil {
-		Log.Debug("Could not marshal UUID!")
-	}
-	pw.AppendByteSlice(BU)
-}
-
 //WriteArray - Write an array of bytes ([]byte)
 func (pw *PacketWriter) WriteArray(val []byte) {
 	pw.AppendByteSlice(val)
@@ -230,4 +222,12 @@ func (pw *PacketWriter) CreateVarInt(val uint32) []byte {
 		}
 	}
 	return buff
+}
+
+func (pw *PacketWriter) WriteUUID(val uuid.UUID) {
+	BU, err := val.MarshalBinary()
+	if err != nil {
+		Log.Debug("Could not marshal UUID!")
+	}
+	pw.AppendByteSlice(BU)
 }

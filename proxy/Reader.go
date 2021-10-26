@@ -191,22 +191,6 @@ func (pr *PacketReader) ReadDouble() (float64, error) {
 	return math.Float64frombits(uint64(doubleBits)), nil
 }
 
-func (pr *PacketReader) ReadUUID() (uuid.UUID, error) {
-	if pr.CheckForEOFWithSeek(16) {
-		return uuid.Nil, io.EOF
-	}
-	UUIDBytes := pr.Data[pr.Seeker : pr.Seeker+16]
-	_, err := pr.SeekWithEOF(16)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	UUID, err := uuid.FromBytes(UUIDBytes)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	return UUID, err
-}
-
 func (pr *PacketReader) ReadString() (string, error) {
 	if pr.CheckForEOF() {
 		return "", errors.New("error on begin start string")
@@ -303,6 +287,22 @@ func (pr *PacketReader) ReadVarLong() (int64, error) {
 		return Result, err
 	}
 	return Result, nil
+}
+
+func (pr *PacketReader) ReadUUID() (uuid.UUID, error) {
+	if pr.CheckForEOFWithSeek(16) {
+		return uuid.Nil, io.EOF
+	}
+	UUIDBytes := pr.Data[pr.Seeker : pr.Seeker+16]
+	_, err := pr.SeekWithEOF(16)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	UUID, err := uuid.FromBytes(UUIDBytes)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return UUID, err
 }
 
 //ReadArray - Returns the array (slice) of the packet Data

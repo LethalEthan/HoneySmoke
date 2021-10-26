@@ -1,6 +1,9 @@
 package proxy
 
-import "sync/atomic"
+import (
+	"net"
+	"sync/atomic"
+)
 
 func (P *ProxyObject) Close() {
 	if P.ServerConn != nil {
@@ -14,14 +17,16 @@ func (P *ProxyObject) Close() {
 
 func (P *ProxyObject) GetClosed() bool {
 	P.CloseMutex.RLock()
-	C := P.Closed
+	C := !P.Closed
 	P.CloseMutex.RUnlock()
 	return C
 }
 
 func (P *ProxyObject) SetClosed() {
 	P.CloseMutex.Lock()
-	P.Closed = false
+	P.Closed = true
+	P.ClientConn = nil
+	P.ServerConn = nil
 	P.CloseMutex.Unlock()
 }
 
@@ -65,4 +70,17 @@ func SetLimbo(L bool) {
 	LimboMutex.Lock()
 	Limbo = L
 	LimboMutex.Unlock()
+}
+
+func GetListener() net.Listener {
+	ListenerMutex.Lock()
+	L := Listener
+	ListenerMutex.Unlock()
+	return L
+}
+
+func SetListener(val net.Listener) {
+	ListenerMutex.Lock()
+	Listener = val
+	ListenerMutex.Unlock()
 }

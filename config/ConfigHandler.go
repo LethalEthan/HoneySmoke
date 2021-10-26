@@ -39,6 +39,7 @@ type Config struct {
 		ApplyStrictMovementChecks bool `yaml:"movement-checks"`       //TBD
 		LimboMode                 bool `yaml:"limbo-mode-when-backend-down"`
 		CheckServerSeconds        int  `yaml:"check-server-seconds"`
+		Listeners                 int  `yaml:"listeners"`
 	} `yaml:"performance"`
 }
 

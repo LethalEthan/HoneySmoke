@@ -19,7 +19,7 @@ func (P *ProxyObject) ProxyBackEnd() {
 			Log.Debug("Connected handling...")
 			break
 		} else {
-			Log.Critical("Error dialing, waiting ", config.GConfig.Performance.CheckServerSeconds, " seconds until retry")
+			Log.Critical("Error dialing, waiting", config.GConfig.Performance.CheckServerSeconds, "seconds until retry")
 			err = nil //reset err otherwise it could just loop
 		}
 		time.Sleep(time.Duration(config.GConfig.Performance.CheckServerSeconds) * time.Second)
@@ -45,30 +45,31 @@ func (P *ProxyObject) HandleBackEnd() {
 	for P.GetClosed() {
 	start:
 		err = nil
-		BytesRead, err = P.ServerConn.Read(data)
-		if err != nil && P.ClientConn != nil {
+		if P.GetClosed() {
+			BytesRead, err = P.ServerConn.Read(data)
+		} else {
+			Log.Warning("Closing backend handler")
+			return
+		}
+		if err != nil && P.ClientConn != nil && P.State == PLAY && P.Player.Name != "" {
 			Log.Warning("Server connection lost unexpectedly! ", err)
-			Log.Warning("Limbo active")
+			Log.Debug("Limbo active")
 			SetLimbo(true)
-			//Create keepalive packer
+			//Create keepalive packet
 			KP := CreatePacketWriterWithCapacity(0x21, 18)
 			buf := make([]byte, 8)
 			rand.Read(buf)
 			r := binary.LittleEndian.Uint64(buf)
 			KP.WriteLong(int64(r))
-			//SetLimbo(true)
 			for P.ClientConn != nil && P.GetClosed() {
 			Reconnect:
 				err = nil //reset err
-				//time.Sleep(4 * time.Second)
 				P.ServerConn, err = net.Dial("tcp", config.GConfig.Server.IP+config.GConfig.Server.Port)
-				if err == nil { //Can connect
+				if err == nil && P.Player.Name != "" { //Can connect
 					Log.Info("Reconnecting...")
 					SetLimbo(false)
-					//Handshake
-					//P.SetState(HANDSHAKE)
 					Log.Debug("Initiating reconnection!")
-					PW := CreatePacketWriter(0x00)
+					PW := CreatePacketWriter(0x00) //Handshake packet
 					PW.ResetData(0x00)
 					PW.WriteVarInt(P.ProtocolVersion)
 					PW.WriteString(config.GConfig.ProxyServer.IP)
@@ -80,8 +81,7 @@ func (P *ProxyObject) HandleBackEnd() {
 						goto Reconnect
 					}
 					//Login Start
-					P.SetState(PLAY)
-					//time.Sleep(1 * time.Millisecond)
+					P.SetState(PLAY) //Client is in play state so just make sure it's still set
 					PW.ResetData(0x00)
 					PW.WriteString(P.Player.Name)
 					P.ServerConn.Write(PW.GetPacket())
@@ -93,32 +93,40 @@ func (P *ProxyObject) HandleBackEnd() {
 					P.SetReconnection(true)
 					goto start //Continue from here
 				} else {
-					Log.Critical("Error dialing, waiting ", config.GConfig.Performance.CheckServerSeconds, " seconds until retry")
-				}
-				if GetLimbo() {
-					if P.GetCompression() > 0 {
-						_, err := P.ClientConn.Write(KP.GetCompressedPacket())
-						if err != nil {
-							Log.Error(err)
-							//SendLimbo = false
+					Log.Debug("Error dialing, waiting", config.GConfig.Performance.CheckServerSeconds, "seconds until retry...")
+					if GetLimbo() {
+						if P.GetCompression() > 0 {
+							_, err := P.ClientConn.Write(KP.GetCompressedPacket())
+							if err != nil {
+								Log.Error(err)
+							}
+						} else {
+							_, err := P.ClientConn.Write(KP.GetPacket())
+							if err != nil {
+								Log.Error(err)
+							}
+							Log.Debug(("Sent limbo non compressed"))
 						}
-					} else {
-						_, err := P.ClientConn.Write(KP.GetPacket())
-						if err != nil {
-							Log.Error(err)
-						}
-						Log.Debug(("Sent limbo non compressed"))
+						Log.Debug("Sent server limbo keepalive")
 					}
-					Log.Debug("Sent server limbo keepalive")
+					time.Sleep(time.Duration(config.GConfig.Performance.CheckServerSeconds) * time.Second)
 				}
-				time.Sleep(time.Duration(config.GConfig.Performance.CheckServerSeconds) * time.Second)
+			}
+		} else {
+			if err != nil && P.ClientConn == nil && !P.GetClosed() {
+				Log.Debug("123: ", err)
+				P.Close()
+				return
 			}
 		}
+		// if err != nil && P.ClientConn == nil && !P.GetClosed() {
+		// 	Log.Error("112: ", err)
+		// 	P.Close()
+		// 	return
+		// }
 		err = nil
 		if BytesRead <= 0 {
-			Log.Critical("Closing because bytes read is 0!")
-			P.Close()
-			return
+			goto start
 		}
 		PR.SetData(data[:BytesRead])
 		//Read packet size
@@ -141,12 +149,16 @@ func (P *ProxyObject) HandleBackEnd() {
 				//New zlib reader
 				ZlibReader, err := zlib.NewReader(ByteReader)
 				if err != nil {
-					panic(err)
+					Log.Error("Error creating Zlib reader: ", err)
+					P.Close()
+					return
 				}
 				//Read decompressed packet
 				DecompressedPacket, err := ioutil.ReadAll(ZlibReader)
 				if err != nil {
-					panic(err)
+					Log.Error("Error decompressing packet: ", err)
+					P.Close()
+					return
 				}
 				//Close ZlibReader
 				ZlibReader.Close()
@@ -203,11 +215,11 @@ func (P *ProxyObject) HandleBackEnd() {
 				Log.Debug("Login success, setting play state")
 				P.Player.UUID, err = PR.ReadUUID()
 				if err != nil {
-					panic(err)
+					Log.Error("Error reading UUID: ", err)
 				}
 				P.Player.Name, err = PR.ReadString()
 				if err != nil {
-					panic(err)
+					Log.Error("Error reading player name: ", err)
 				}
 				Log.Debug("UUID: ", P.Player.UUID, "Player: ", P.Player.Name)
 				P.SetState(PLAY)
@@ -224,28 +236,15 @@ func (P *ProxyObject) HandleBackEnd() {
 			}
 		case PLAY:
 			switch PacketID {
-			case 0x05:
-				P.Player.Locale, err = PR.ReadString()
-				P.Player.ViewDistance, err = PR.ReadByte()
-				P.Player.ChatMode, _, err = PR.ReadVarInt()
-				P.Player.ChatColours, err = PR.ReadBoolean()
-				P.Player.DisplayedSkinParts, err = PR.ReadUnsignedByte()
-				P.Player.MainHand, _, err = PR.ReadVarInt()
-				P.Player.DisableTextFiltering, err = PR.ReadBoolean()
-				if err != nil {
-					Log.Error(err)
-				}
 			case 0x1A:
 				Log.Critical("Disconnect Play receieved, ignoring")
 				SetLimbo(true)
 			case 0x21:
 				Log.Debug("Sending Keepalive CB 0x21")
 			case 0x26:
-				if config.GConfig.ProxyServer.DEBUG {
-					Log.Debug("Sending JoinGame 0x26")
-				}
+				Log.Debug("Sending JoinGame 0x26")
 			case 0x32:
-				if P.Reconnection {
+				if P.GetReconnection() {
 					PW := CreatePacketWriter(0x05)
 					PW.WriteString(P.Player.Locale)
 					PW.WriteByte(P.Player.ViewDistance)
@@ -261,17 +260,17 @@ func (P *ProxyObject) HandleBackEnd() {
 						P.ServerConn.Write(PW.GetPacket())
 					}
 				}
-			case 0x38:
+			case 0x36:
 				if P.GetReconnection() {
 					Log.Debug("Sending player pos and look")
-					P.ClientConn.Write(PR.Data)
+					P.ClientConn.Write(data[:BytesRead])
 					Log.Debug("Sent pos and look")
 					P.SetReconnection(false)
 				}
 			}
 		}
 		err = nil
-		if !GetLimbo() && !P.GetReconnection() {
+		if !GetLimbo() && !P.GetReconnection() && P.GetClosed() {
 			P.ClientConn.Write(data[:BytesRead])
 		}
 	}

@@ -5,8 +5,6 @@ func (P *ProxyObject) HandleFrontEnd() {
 	var err error
 	var BytesRead int
 	var PacketID int32
-	var PacketSize int32
-	var DataLength int32
 	var RSD []byte
 	PR := CreatePacketReader([]byte{0x00})
 	Log.Debug("Started Client Handle")
@@ -15,7 +13,8 @@ func (P *ProxyObject) HandleFrontEnd() {
 		err = nil
 		BytesRead, err = P.ClientConn.Read(data)
 		if err != nil {
-			Log.Warning("Closing Frontend: ", err)
+			Log.Warning("Closing Client")
+			Log.Debug("Closing Client reason: ", err)
 			P.Close()
 			return
 		}
@@ -25,13 +24,11 @@ func (P *ProxyObject) HandleFrontEnd() {
 			return
 		}
 		PR.SetData(data[:BytesRead])
-		PacketSize, DataLength, PacketID, RSD, err = P.HandlePacketHeader(PR)
-		PR.SetData(RSD)
+		_, _, PacketID, RSD, err = P.HandlePacketHeader(PR)
 		if err != nil {
 			panic(err)
 		}
-		_ = PacketSize
-		_ = DataLength
+		PR.SetData(RSD)
 		switch P.GetState() {
 		case HANDSHAKE:
 			switch PacketID {
@@ -78,7 +75,7 @@ func (P *ProxyObject) HandleFrontEnd() {
 			switch PacketID {
 			case 0x00:
 				Log.Debug("Recieved Status 0x00 SB")
-				P.ClientConn.Write(PR.Data)
+				P.ClientConn.Write(data[:BytesRead]) //PR.Data)
 				P.Close()
 				return
 			case 0x01:
@@ -90,13 +87,13 @@ func (P *ProxyObject) HandleFrontEnd() {
 				Log.Critical("Disconnect Play receieved, ignoring")
 				SetLimbo(true)
 			case 0x05:
-				P.Player.Locale, err = PR.ReadString()
-				P.Player.ViewDistance, err = PR.ReadByte()
-				P.Player.ChatMode, _, err = PR.ReadVarInt()
-				P.Player.ChatColours, err = PR.ReadBoolean()
-				P.Player.DisplayedSkinParts, err = PR.ReadUnsignedByte()
-				P.Player.MainHand, _, err = PR.ReadVarInt()
-				P.Player.DisableTextFiltering, err = PR.ReadBoolean()
+				P.Player.Locale, _ = PR.ReadString()
+				P.Player.ViewDistance, _ = PR.ReadByte()
+				P.Player.ChatMode, _, _ = PR.ReadVarInt()
+				P.Player.ChatColours, _ = PR.ReadBoolean()
+				P.Player.DisplayedSkinParts, _ = PR.ReadUnsignedByte()
+				P.Player.MainHand, _, _ = PR.ReadVarInt()
+				P.Player.DisableTextFiltering, _ = PR.ReadBoolean()
 			case 0x0F:
 				Log.Debug("Recieved Play Keepalive SB 0x0F")
 				if GetLimbo() {
@@ -104,7 +101,7 @@ func (P *ProxyObject) HandleFrontEnd() {
 				}
 			}
 		}
-		if !GetLimbo() && !P.GetReconnection() {
+		if !GetLimbo() && !P.GetReconnection() && P.GetClosed() {
 			P.ServerConn.Write(data[:BytesRead])
 		}
 	}

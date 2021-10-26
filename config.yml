@@ -16,3 +16,4 @@ performance: #Change me!
    movement-checks: false #TBD
    limbo-mode-when-backend-down: false #TBD
    check-server-seconds: 1 #Change this one for connecting to the backend server
+   listeners: 4

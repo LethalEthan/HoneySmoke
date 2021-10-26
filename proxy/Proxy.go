@@ -2,8 +2,6 @@ package proxy
 
 import (
 	"HoneySmoke/config"
-	"crypto/rand"
-	"encoding/binary"
 	"net"
 	"runtime"
 	"sync"
@@ -39,13 +37,16 @@ type PlayerObject struct {
 	DisplayedSkinParts   byte
 	MainHand             int32 //Why is this varint
 	DisableTextFiltering bool
+	Authenticated        bool
 }
 
 var (
-	Log        = logging.MustGetLogger("HoneySmoke")
-	Listener   net.Listener
-	Limbo      = false
-	LimboMutex sync.RWMutex
+	Log           = logging.MustGetLogger("HoneySmoke")
+	Listener      net.Listener
+	ListenerMutex sync.Mutex
+	Limbo         = false
+	LimboMutex    sync.RWMutex
+	ProxyObjects  sync.Map
 )
 
 const (
@@ -55,16 +56,18 @@ const (
 	PLAY      = 3
 )
 
-func ProxyListener(IP string, Port string) {
-	runtime.LockOSThread()
-	var err error
-	if Listener == nil {
-		Listener, err = net.Listen("tcp", IP+Port)
+func CreateProxyListener(IP string, Port string) {
+	if GetListener() == nil {
+		L, err := net.Listen("tcp", IP+Port)
 		if err != nil {
 			panic(err)
 		}
+		SetListener(L)
 	}
-	go CheckForLimbo()
+}
+
+func ProxyListener() {
+	runtime.LockOSThread()
 	for {
 		ClientConn, err := Listener.Accept()
 		if err != nil {
@@ -76,8 +79,7 @@ func ProxyListener(IP string, Port string) {
 			P := new(ProxyObject)
 			P.Player = new(PlayerObject)
 			P.ClientConn = ClientConn
-			//P.FAddr = ClientConn.RemoteAddr().String()
-			P.Closed = true
+			P.Closed = false
 			go P.ProxyBackEnd()
 		}
 	}
@@ -101,30 +103,6 @@ func CheckForLimbo() {
 				SetLimbo(false)
 			}
 			S.Close()
-		}
-	}
-}
-
-func (P *ProxyObject) StartLimbo() {
-	Log.Debug("LIMBOACTIVE!")
-	ticks := time.Duration(20 * 50)
-	ticker := time.NewTicker(ticks * time.Millisecond) //time.Tick(ticks * time.Millisecond)
-	defer ticker.Stop()
-	for GetLimbo() {
-		<-ticker.C
-		if P.GetState() == PLAY {
-			//Keepalive
-			PW := CreatePacketWriterWithCapacity(0x21, 18)
-			buf := make([]byte, 8)
-			rand.Read(buf)
-			r := binary.LittleEndian.Uint64(buf)
-			PW.WriteLong(int64(r))
-			_, err := P.ClientConn.Write(PW.GetPacket())
-			if err != nil {
-				Log.Critical("Cannot send to client closing limbo")
-				P.Close()
-				return
-			}
 		}
 	}
 }

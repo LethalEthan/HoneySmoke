@@ -31,7 +31,9 @@ func main() {
 	//Logger Creation END
 	Log.Info("HoneySmoke" /*utils.GetVersionString()*/, "0.0.0.1", "starting...")
 	Log.Warning("HoneySmoke is in alpha! It is not complete and has many left overs and debugging statements left!")
+	Log.Warning("Please report any bugs, unexpected behaviour and potential features you would like")
 	go console.Console()
+	proxy.Keys()
 	if config.GConfig.Performance.CPU <= 0 {
 		Log.Info("Setting GOMAXPROCS to all available logical CPU's")
 		runtime.GOMAXPROCS(runtime.NumCPU()) //Set it to the value of how many cores
@@ -39,5 +41,10 @@ func main() {
 		Log.Info("Setting GOMAXPROCS to config: ", config.GConfig.Performance.CPU)
 		runtime.GOMAXPROCS(config.GConfig.Performance.CPU)
 	}
-	proxy.ProxyListener(conf.ProxyServer.IP, conf.ProxyServer.Port)
+	go proxy.CheckForLimbo()
+	proxy.CreateProxyListener(conf.ProxyServer.IP, conf.ProxyServer.Port)
+	for i := 0; i < conf.Performance.Listeners-1; i++ {
+		go proxy.ProxyListener()
+	}
+	proxy.ProxyListener()
 }
