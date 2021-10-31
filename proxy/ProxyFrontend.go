@@ -10,11 +10,18 @@ func (P *ProxyObject) HandleFrontEnd() {
 	Log.Debug("Started Client Handle")
 	P.SetState(HANDSHAKE)
 	for P.GetClosed() {
+		//start:
 		err = nil
-		BytesRead, err = P.ClientConn.Read(data)
-		if err != nil {
-			Log.Warning("Closing Client")
-			Log.Debug("Closing Client reason: ", err)
+		if P.GetClosed() && P.ClientConn != nil {
+			BytesRead, err = P.ClientConn.Read(data)
+			if err != nil {
+				Log.Warning("Closing Client")
+				Log.Debug("Closing Client reason: ", err)
+				P.Close()
+				return
+			}
+		} else {
+			Log.Critical("Closing")
 			P.Close()
 			return
 		}
@@ -57,7 +64,16 @@ func (P *ProxyObject) HandleFrontEnd() {
 					return
 				}
 				P.SetState(uint32(NextState))
-				Log.Debug("NEXTSTATE: ", P.GetState())
+				// if P.ProtocolVersion != 756 {
+				// 	Log.Debug("NEXTSTATE: ", P.GetState())
+				// 	PW := CreatePacketWriter(0x00)
+				// 	PW.WriteVarInt(756)
+				// 	PW.WriteString(P.ServerAddress)
+				// 	PW.WriteUnsignedShort(ServerPort)
+				// 	PW.WriteVarInt(NextState)
+				// 	P.ServerConn.Write(PW.GetPacket())
+				// 	goto start
+				// }
 			}
 		case LOGIN:
 			switch PacketID {

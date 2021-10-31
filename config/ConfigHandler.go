@@ -12,8 +12,8 @@ import (
 var (
 	log        = logging.MustGetLogger("HoneyBEE")
 	GConfig    *Config
-	Memprofile string
-	Cpuprofile string
+	MemProfile string
+	CpuProfile string
 )
 
 // Config struct for HoneyBEE config
@@ -27,10 +27,10 @@ type Config struct {
 			AvailableProtocols []int `yaml:"available-protocols"`
 		} `yaml:"protocol"`
 	} `yaml:"proxy-server"`
-	Server struct {
-		IP   string `yaml:"ip"`
-		Port string `yaml:"port"`
-	} `yaml:"server"`
+	Backends struct {
+		Servers              []string `yaml:"servers"`
+		LoadBalancingServers []string `yaml:"load-balancing-servers"`
+	} `yaml:"backends"`
 	Performance struct {
 		CPU                       int  `yaml:"cpu"`
 		GCPercent                 int  `yaml:"gc-percent"`
@@ -78,8 +78,8 @@ func ParseFlags() (string, error) {
 	//var configPath string
 	//Set up a CLI flag "-config" to allow users to supply the configuration file - defaults to config.yml
 	flag.StringVar(&configPath, "config", "./config.yml", "path to config file")
-	flag.StringVar(&Memprofile, "memprofile", "", "write memory profile to this file")
-	flag.StringVar(&Cpuprofile, "cpuprofile", "", "write cpu profile to file")
+	flag.StringVar(&MemProfile, "memprofile", "", "write memory profile to this file")
+	flag.StringVar(&CpuProfile, "cpuprofile", "", "write cpu profile to file")
 	//Parse the flags
 	flag.Parse()
 	//Validate the path

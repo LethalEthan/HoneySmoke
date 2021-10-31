@@ -5,9 +5,10 @@ proxy-server:
   timeout: 15 #Doesn't do anything rn
   protocol:
     AvailableProtocols: [] #Doesn't do anything rn
-server:
-  ip: "127.0.0.1"
-  port: ":25567"
+backends:
+  servers: ["127.0.0.1:25567"] #First server in list is the one that it will connect to first
+  load-balancing-servers: [] #Enter the array number in the list above that you want to load balance
+  load-balancing-type: "none" #
 performance: #Change me!
    cpu: 0 #0 = all cores
    gc-percent: 100 #Not implemented

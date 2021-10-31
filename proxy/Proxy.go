@@ -41,12 +41,13 @@ type PlayerObject struct {
 }
 
 var (
-	Log           = logging.MustGetLogger("HoneySmoke")
-	Listener      net.Listener
-	ListenerMutex sync.Mutex
-	Limbo         = false
-	LimboMutex    sync.RWMutex
-	ProxyObjects  sync.Map
+	Log               = logging.MustGetLogger("HoneySmoke")
+	Listener          net.Listener
+	ListenerMutex     sync.Mutex
+	Limbo             = false
+	LimboMutex        sync.RWMutex
+	ProxyObjects      map[string]*ProxyObject
+	ProxyObjectsMutex sync.RWMutex
 )
 
 const (
@@ -95,7 +96,7 @@ func CheckForLimbo() {
 		defer ticker.Stop()
 		for {
 			<-ticker.C
-			S, err = net.Dial("tcp", config.GConfig.Server.IP+config.GConfig.ProxyServer.Port)
+			S, err = net.Dial("tcp", config.GConfig.Backends.Servers[0])
 			if err != nil {
 				SetLimbo(true)
 				<-ticker.C

@@ -51,16 +51,15 @@ func Console() {
 		case "panic":
 			panic("panicked, you told me to :)")
 		case "cpuprofile":
-			if config.Cpuprofile != "" {
+			if config.CpuProfile != "" {
 				pprof.StopCPUProfile()
-				cprof.Close() // error handling omitted for example
+				cprof.Close()
 				Log.Warning("Written CPU Profile")
 			} else {
 				Log.Critical("cpuprofile flag not specified! not writing a profile")
 			}
 		case "memprofile":
-			if config.Memprofile != "" {
-				runtime.GC() // get up-to-date statistics
+			if config.MemProfile != "" {
 				if err := pprof.WriteHeapProfile(hprof); err != nil {
 					log.Fatal("could not write memory profile: ", err)
 				} else {
@@ -70,15 +69,15 @@ func Console() {
 				Log.Critical("memprofile flag not specified! not writing a profile")
 			}
 		case "profile":
-			if config.Cpuprofile != "" {
+			if config.CpuProfile != "" {
 				pprof.StopCPUProfile()
-				cprof.Close() // error handling omitted for example
+				cprof.Close()
 				Log.Warning("Written CPU Profile")
 			} else {
 				Log.Critical("cpuprofile flag not specified! not writing a cpuprofile")
 			}
 			//
-			if config.Memprofile != "" {
+			if config.MemProfile != "" {
 				runtime.GC() // get up-to-date statistics
 				if err := pprof.WriteHeapProfile(hprof); err != nil {
 					log.Fatal("could not write memory profile: ", err)
@@ -120,5 +119,6 @@ func Shutdown() {
 	if config.GConfig.ProxyServer.DEBUG {
 		PrintDebugStats()
 	}
+	//fmt.Println(proxy.ProxyObjects)
 	os.Exit(0)
 }

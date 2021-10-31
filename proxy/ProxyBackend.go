@@ -14,7 +14,7 @@ import (
 func (P *ProxyObject) ProxyBackEnd() {
 	var err error
 	for {
-		P.ServerConn, err = net.Dial("tcp", config.GConfig.Server.IP+config.GConfig.Server.Port)
+		P.ServerConn, err = net.Dial("tcp", config.GConfig.Backends.Servers[0])
 		if err == nil {
 			Log.Debug("Connected handling...")
 			break
@@ -26,7 +26,6 @@ func (P *ProxyObject) ProxyBackEnd() {
 	}
 	go P.HandleFrontEnd()
 	go P.HandleBackEnd()
-	//go P.CheckForLimbo()
 }
 
 func (P *ProxyObject) HandleBackEnd() {
@@ -45,10 +44,10 @@ func (P *ProxyObject) HandleBackEnd() {
 	for P.GetClosed() {
 	start:
 		err = nil
-		if P.GetClosed() {
+		if P.GetClosed() && P.ServerConn != nil {
 			BytesRead, err = P.ServerConn.Read(data)
 		} else {
-			Log.Warning("Closing backend handler")
+			Log.Warning("Closing backend handler") //Probably do a goto reconnect
 			return
 		}
 		if err != nil && P.ClientConn != nil && P.State == PLAY && P.Player.Name != "" {
@@ -64,7 +63,7 @@ func (P *ProxyObject) HandleBackEnd() {
 			for P.ClientConn != nil && P.GetClosed() {
 			Reconnect:
 				err = nil //reset err
-				P.ServerConn, err = net.Dial("tcp", config.GConfig.Server.IP+config.GConfig.Server.Port)
+				P.ServerConn, err = net.Dial("tcp", config.GConfig.Backends.Servers[0])
 				if err == nil && P.Player.Name != "" { //Can connect
 					Log.Info("Reconnecting...")
 					SetLimbo(false)
@@ -75,9 +74,13 @@ func (P *ProxyObject) HandleBackEnd() {
 					PW.WriteString(config.GConfig.ProxyServer.IP)
 					PW.WriteShort(25567)
 					PW.WriteVarInt(2)
-					_, err := P.ServerConn.Write(PW.GetPacket())
-					if err != nil {
-						P.ServerConn.Close()
+					if P.ServerConn != nil {
+						_, err := P.ServerConn.Write(PW.GetPacket())
+						if err != nil {
+							P.ServerConn.Close()
+							goto Reconnect
+						}
+					} else {
 						goto Reconnect
 					}
 					//Login Start
@@ -91,6 +94,7 @@ func (P *ProxyObject) HandleBackEnd() {
 						goto Reconnect
 					}
 					P.SetReconnection(true)
+					SetLimbo(false)
 					goto start //Continue from here
 				} else {
 					Log.Debug("Error dialing, waiting", config.GConfig.Performance.CheckServerSeconds, "seconds until retry...")
@@ -127,6 +131,11 @@ func (P *ProxyObject) HandleBackEnd() {
 		err = nil
 		if BytesRead <= 0 {
 			goto start
+		}
+		if BytesRead > 2097152 {
+			Log.Critical("Packet size is greater than 2097152!")
+			P.Close()
+			return
 		}
 		PR.SetData(data[:BytesRead])
 		//Read packet size
@@ -239,6 +248,11 @@ func (P *ProxyObject) HandleBackEnd() {
 			case 0x1A:
 				Log.Critical("Disconnect Play receieved, ignoring")
 				SetLimbo(true)
+			case 0x1B:
+				if P.ProtocolVersion == 578 {
+					Log.Critical("Disconnect Play receieved, ignoring")
+					//SetLimbo(true)
+				}
 			case 0x21:
 				Log.Debug("Sending Keepalive CB 0x21")
 			case 0x26:
@@ -266,6 +280,7 @@ func (P *ProxyObject) HandleBackEnd() {
 					P.ClientConn.Write(data[:BytesRead])
 					Log.Debug("Sent pos and look")
 					P.SetReconnection(false)
+					SetLimbo(false)
 				}
 			}
 		}
