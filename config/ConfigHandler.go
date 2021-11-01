@@ -32,14 +32,14 @@ type Config struct {
 		LoadBalancingServers []string `yaml:"load-balancing-servers"`
 	} `yaml:"backends"`
 	Performance struct {
-		CPU                       int  `yaml:"cpu"`
-		GCPercent                 int  `yaml:"gc-percent"`
-		CheckServerOnlineTick     int  `yaml:"check-server-per-tick"` //How many ticks should go before a status check is initiated
-		PacketsPerSecond          int  `yaml:"packets-per-second"`    //TBD
-		ApplyStrictMovementChecks bool `yaml:"movement-checks"`       //TBD
-		LimboMode                 bool `yaml:"limbo-mode-when-backend-down"`
-		CheckServerSeconds        int  `yaml:"check-server-seconds"`
-		Listeners                 int  `yaml:"listeners"`
+		CPU                       int    `yaml:"cpu"`
+		GCPercent                 int    `yaml:"gc-percent"`
+		CheckServerOnlineTick     int    `yaml:"check-server-per-tick"` //How many ticks should go before a status check is initiated
+		PacketsPerSecond          uint32 `yaml:"packets-per-second"`    //TBD
+		ApplyStrictMovementChecks bool   `yaml:"movement-checks"`       //TBD
+		LimboMode                 bool   `yaml:"limbo-mode-when-backend-down"`
+		CheckServerSeconds        int    `yaml:"check-server-seconds"`
+		Listeners                 int    `yaml:"listeners"`
 	} `yaml:"performance"`
 }
 

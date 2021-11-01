@@ -38,14 +38,14 @@ type jsonResponse struct {
 	ID string `json:"id"`
 }
 
-func Authenticate(username, serverID string, sharedSecret, publicKey []byte) (uuid.UUID, error) {
+func Authenticate(username, serverID string, sharedSecret []byte) (uuid.UUID, error) {
 	//A hash is created using the shared secret and public key and is sent to the mojang sessionserver
 	//The server returns the data about the player including the player's skin blob
 	//Again I cannot thank enough wiki.vg, this is based off one of the linked java gists by Drew DeVault; thank you for the gist that I used to base this off
 	sha := sha1.New()
 	sha.Write([]byte(serverID))
 	sha.Write(sharedSecret)
-	sha.Write(publicKey)
+	sha.Write(publicKeySlice)
 	hash := sha.Sum(nil)
 
 	negative := (hash[0] & 0x80) == 0x80
@@ -126,7 +126,7 @@ func Keys() {
 }
 
 func Auth(username string, sharedSecret []byte) uuid.UUID {
-	PlayerUUID, autherr := Authenticate(username, "", sharedSecret, publicKeySlice)
+	PlayerUUID, autherr := Authenticate(username, "", sharedSecret)
 	if autherr != nil {
 		Log.Error("Auth Fail!")
 		return uuid.Nil

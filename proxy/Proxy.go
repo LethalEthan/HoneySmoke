@@ -1,30 +1,41 @@
 package proxy
 
 import (
-	"HoneySmoke/config"
 	"net"
 	"runtime"
 	"sync"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/op/go-logging"
 )
 
+//Multiple proxies can be setup on different ports and IP's -- not finished
+
+type Proxy struct {
+	IP                string
+	Port              string
+	Listener          net.Listener
+	ListenerMutex     sync.Mutex
+	Limbo             bool
+	LimboMutex        sync.RWMutex
+	ProxyObjects      map[string]ProxyObject
+	ProxyObjectsMutex sync.RWMutex
+}
+
 type ProxyObject struct {
 	ClientConn        net.Conn
 	ServerConn        net.Conn
-	CloseMutex        sync.RWMutex
-	LimboMutex        sync.Mutex
 	Closed            bool
-	Limbo             bool
+	CloseMutex        sync.RWMutex
 	State             uint32
 	ProtocolVersion   int32
 	ServerAddress     string
 	Compression       int32
-	Player            *PlayerObject
+	Player            PlayerObject
 	Reconnection      bool
 	ReconnectionMutex sync.Mutex
+	PacketPerSecondC  chan byte
+	PPSCount          uint32
 }
 
 type PlayerObject struct {
@@ -41,13 +52,8 @@ type PlayerObject struct {
 }
 
 var (
-	Log               = logging.MustGetLogger("HoneySmoke")
-	Listener          net.Listener
-	ListenerMutex     sync.Mutex
-	Limbo             = false
-	LimboMutex        sync.RWMutex
-	ProxyObjects      map[string]*ProxyObject
-	ProxyObjectsMutex sync.RWMutex
+	Log       = logging.MustGetLogger("HoneySmoke")
+	MainProxy Proxy
 )
 
 const (
@@ -57,53 +63,59 @@ const (
 	PLAY      = 3
 )
 
-func CreateProxyListener(IP string, Port string) {
-	if GetListener() == nil {
+func CreateProxyListener(IP string, Port string) *Proxy {
+	MainProxy = *new(Proxy)
+	MainProxy.ProxyObjects = make(map[string]ProxyObject)
+	if MainProxy.GetListener() == nil {
 		L, err := net.Listen("tcp", IP+Port)
 		if err != nil {
 			panic(err)
 		}
-		SetListener(L)
+		MainProxy.SetListener(L)
 	}
+	Log.Info("Created Proxy listener")
+	return &MainProxy
 }
 
-func ProxyListener() {
+func (P *Proxy) ProxyListener() {
 	runtime.LockOSThread()
 	for {
-		ClientConn, err := Listener.Accept()
+		ClientConn, err := P.Listener.Accept()
 		if err != nil {
 			Log.Critical("Could not accept connection!")
 			Log.Critical("Reason: ", err)
 			ClientConn.Close()
 		} else {
 			//Create Proxy object with all required info and spin off the handlers
-			P := new(ProxyObject)
-			P.Player = new(PlayerObject)
-			P.ClientConn = ClientConn
-			P.Closed = false
-			go P.ProxyBackEnd()
+			PO := new(ProxyObject)
+			PO.Player = *new(PlayerObject)
+			PO.ClientConn = ClientConn
+			PO.Closed = false
+			PO.PacketPerSecondC = make(chan byte, 10)
+			P.ProxyObjects[ClientConn.RemoteAddr().String()] = *PO
+			go PO.ProxyBackEnd()
 		}
 	}
 }
 
-func CheckForLimbo() {
-	if config.GConfig.Performance.LimboMode {
-		var err error
-		var S net.Conn
-		Log.Debug("LIMBO CHECK ACTIVE!")
-		ticks := time.Duration(config.GConfig.Performance.CheckServerOnlineTick * 50)
-		ticker := time.NewTicker(ticks * time.Millisecond) //time.Tick(ticks * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			<-ticker.C
-			S, err = net.Dial("tcp", config.GConfig.Backends.Servers[0])
-			if err != nil {
-				SetLimbo(true)
-				<-ticker.C
-			} else {
-				SetLimbo(false)
-			}
-			S.Close()
-		}
-	}
-}
+// func CheckForLimbo() {
+// 	if config.GConfig.Performance.LimboMode {
+// 		var err error
+// 		var S net.Conn
+// 		Log.Debug("LIMBO CHECK ACTIVE!")
+// 		ticks := time.Duration(config.GConfig.Performance.CheckServerOnlineTick * 50)
+// 		ticker := time.NewTicker(ticks * time.Millisecond) //time.Tick(ticks * time.Millisecond)
+// 		defer ticker.Stop()
+// 		for {
+// 			<-ticker.C
+// 			S, err = net.Dial("tcp", config.GConfig.Backends.Servers[0])
+// 			if err != nil {
+// 				SetLimbo(true)
+// 				<-ticker.C
+// 			} else {
+// 				SetLimbo(false)
+// 			}
+// 			S.Close()
+// 		}
+// 	}
+// }

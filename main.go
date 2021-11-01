@@ -7,9 +7,10 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"runtime/debug"
 	"runtime/pprof"
 
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 )
 
 var (
@@ -25,7 +26,7 @@ func main() {
 	B1 := logging.NewLogBackend(os.Stderr, "", 0)       //New Backend
 	B1Format := logging.NewBackendFormatter(B1, format) //Set Format
 	B1LF := logging.AddModuleLevel(B1Format)            //Add formatting Levels
-	conf := config.ConfigStart()
+	_ = config.ConfigStart()
 	if config.GConfig.ProxyServer.DEBUG {
 		B1LF.SetLevel(logging.DEBUG, "")
 	} else {
@@ -36,6 +37,19 @@ func main() {
 	Log.Info("HoneySmoke", "0.0.0.2", "starting...")
 	Log.Warning("HoneySmoke is in alpha! It is not complete and has many left overs and debugging statements left!")
 	Log.Warning("Please report any bugs, unexpected behaviour and potential features you would like")
+	if config.GConfig.Performance.CPU <= 0 {
+		Log.Info("Setting GOMAXPROCS to all available logical CPU's")
+		runtime.GOMAXPROCS(runtime.NumCPU()) //Set it to the value of how many cores
+	} else {
+		Log.Info("Setting GOMAXPROCS to config: ", config.GConfig.Performance.CPU)
+		runtime.GOMAXPROCS(config.GConfig.Performance.CPU)
+	}
+	if config.GConfig.Performance.GCPercent < 0 {
+		debug.SetGCPercent(100)
+	} else {
+		Log.Debug("Setting GCPercent to: ", config.GConfig.Performance.GCPercent)
+		debug.SetGCPercent(config.GConfig.Performance.GCPercent)
+	}
 	//MemProf
 	if config.MemProfile != "" {
 		var err error
@@ -56,17 +70,10 @@ func main() {
 	}
 	go console.Console()
 	proxy.Keys()
-	if config.GConfig.Performance.CPU <= 0 {
-		Log.Info("Setting GOMAXPROCS to all available logical CPU's")
-		runtime.GOMAXPROCS(runtime.NumCPU()) //Set it to the value of how many cores
-	} else {
-		Log.Info("Setting GOMAXPROCS to config: ", config.GConfig.Performance.CPU)
-		runtime.GOMAXPROCS(config.GConfig.Performance.CPU)
+	//go proxy.CheckForLimbo()
+	P := proxy.CreateProxyListener(config.GConfig.ProxyServer.IP, config.GConfig.ProxyServer.Port)
+	for i := 0; i < config.GConfig.Performance.Listeners-1; i++ {
+		go P.ProxyListener()
 	}
-	go proxy.CheckForLimbo()
-	proxy.CreateProxyListener(conf.ProxyServer.IP, conf.ProxyServer.Port)
-	for i := 0; i < conf.Performance.Listeners-1; i++ {
-		go proxy.ProxyListener()
-	}
-	proxy.ProxyListener()
+	P.ProxyListener()
 }

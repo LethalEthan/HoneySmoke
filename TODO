@@ -1,3 +1,8 @@
 Kick clients when packets are too large
 Do extra packet check to prevent crashes on both server and proxy
 Authetication
+Finish compression packets
+Do plugins
+Do crimes
+Finish pps
+Switch to gnet client when available to windows, linux and mac

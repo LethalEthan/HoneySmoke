@@ -53,7 +53,7 @@ func (P *ProxyObject) HandleBackEnd() {
 		if err != nil && P.ClientConn != nil && P.State == PLAY && P.Player.Name != "" {
 			Log.Warning("Server connection lost unexpectedly! ", err)
 			Log.Debug("Limbo active")
-			SetLimbo(true)
+			MainProxy.SetLimbo(true)
 			//Create keepalive packet
 			KP := CreatePacketWriterWithCapacity(0x21, 18)
 			buf := make([]byte, 8)
@@ -66,7 +66,7 @@ func (P *ProxyObject) HandleBackEnd() {
 				P.ServerConn, err = net.Dial("tcp", config.GConfig.Backends.Servers[0])
 				if err == nil && P.Player.Name != "" { //Can connect
 					Log.Info("Reconnecting...")
-					SetLimbo(false)
+					MainProxy.SetLimbo(false)
 					Log.Debug("Initiating reconnection!")
 					PW := CreatePacketWriter(0x00) //Handshake packet
 					PW.ResetData(0x00)
@@ -94,11 +94,11 @@ func (P *ProxyObject) HandleBackEnd() {
 						goto Reconnect
 					}
 					P.SetReconnection(true)
-					SetLimbo(false)
+					MainProxy.SetLimbo(false)
 					goto start //Continue from here
 				} else {
 					Log.Debug("Error dialing, waiting", config.GConfig.Performance.CheckServerSeconds, "seconds until retry...")
-					if GetLimbo() {
+					if MainProxy.GetLimbo() {
 						if P.GetCompression() > 0 {
 							_, err := P.ClientConn.Write(KP.GetCompressedPacket())
 							if err != nil {
@@ -247,7 +247,7 @@ func (P *ProxyObject) HandleBackEnd() {
 			switch PacketID {
 			case 0x1A:
 				Log.Critical("Disconnect Play receieved, ignoring")
-				SetLimbo(true)
+				MainProxy.SetLimbo(true)
 			case 0x1B:
 				if P.ProtocolVersion == 578 {
 					Log.Critical("Disconnect Play receieved, ignoring")
@@ -280,12 +280,12 @@ func (P *ProxyObject) HandleBackEnd() {
 					P.ClientConn.Write(data[:BytesRead])
 					Log.Debug("Sent pos and look")
 					P.SetReconnection(false)
-					SetLimbo(false)
+					MainProxy.SetLimbo(false)
 				}
 			}
 		}
 		err = nil
-		if !GetLimbo() && !P.GetReconnection() && P.GetClosed() {
+		if !MainProxy.GetLimbo() && !P.GetReconnection() && P.GetClosed() {
 			P.ClientConn.Write(data[:BytesRead])
 		}
 	}

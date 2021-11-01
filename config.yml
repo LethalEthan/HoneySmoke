@@ -11,10 +11,10 @@ backends:
   load-balancing-type: "none" #
 performance: #Change me!
    cpu: 0 #0 = all cores
-   gc-percent: 100 #Not implemented
+   gc-percent: 100
    check-server-per-tick: 20 #TBD
-   packets-per-second: 0 #TBD
+   packets-per-second: 200
    movement-checks: false #TBD
-   limbo-mode-when-backend-down: false #TBD
+   limbo-mode-when-backend-down: false #TBD - currently is on all time
    check-server-seconds: 1 #Change this one for connecting to the backend server
    listeners: 4

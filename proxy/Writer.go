@@ -38,7 +38,7 @@ func CreatePacketWriterWithCapacity(PacketID int32, Capacity int) *PacketWriter 
 	return pw
 }
 
-func (pw *PacketWriter) GetCompressedPacket() []byte {
+func (pw *PacketWriter) GetCompressedPacket() []byte { //Finish this
 	pw.packetSize = len(pw.data) //Set packet length
 	if pw.packetSize < 256 {
 		p := append(pw.CreateVarInt(uint32(pw.packetSize+1)), 0x00)
@@ -47,8 +47,6 @@ func (pw *PacketWriter) GetCompressedPacket() []byte {
 	} else {
 		panic("PacketSize is bigger than 256")
 	}
-	// Log.Debug("PacketSize: ", len(pw.data))
-	// Log.Debug("Packet Contents: ", pw.data)
 }
 
 func (pw *PacketWriter) GetData() []byte {

@@ -1,18 +1,30 @@
 package proxy
 
+import (
+	"HoneySmoke/config"
+	"sync/atomic"
+	"time"
+)
+
 func (P *ProxyObject) HandleFrontEnd() {
 	var data = make([]byte, 2097152) //Create buffer to store packet contents in
 	var err error
 	var BytesRead int
 	var PacketID int32
 	var RSD []byte
+	var PPS uint32
 	PR := CreatePacketReader([]byte{0x00})
 	Log.Debug("Started Client Handle")
 	P.SetState(HANDSHAKE)
+	go P.PPS()
 	for P.GetClosed() {
 		//start:
 		err = nil
 		if P.GetClosed() && P.ClientConn != nil {
+			PPS = atomic.LoadUint32(&P.PPSCount)
+			if PPS > config.GConfig.Performance.PacketsPerSecond {
+				Log.Debug("PPS is greater than 10!")
+			}
 			BytesRead, err = P.ClientConn.Read(data)
 			if err != nil {
 				Log.Warning("Closing Client")
@@ -30,6 +42,9 @@ func (P *ProxyObject) HandleFrontEnd() {
 			P.Close()
 			return
 		}
+		go func(P *ProxyObject) {
+			P.PacketPerSecondC <- 0
+		}(P)
 		PR.SetData(data[:BytesRead])
 		_, _, PacketID, RSD, err = P.HandlePacketHeader(PR)
 		if err != nil {
@@ -101,7 +116,7 @@ func (P *ProxyObject) HandleFrontEnd() {
 			switch PacketID {
 			case 0x1A:
 				Log.Critical("Disconnect Play receieved, ignoring")
-				SetLimbo(true)
+				MainProxy.SetLimbo(true)
 			case 0x05:
 				P.Player.Locale, _ = PR.ReadString()
 				P.Player.ViewDistance, _ = PR.ReadByte()
@@ -112,14 +127,32 @@ func (P *ProxyObject) HandleFrontEnd() {
 				P.Player.DisableTextFiltering, _ = PR.ReadBoolean()
 			case 0x0F:
 				Log.Debug("Recieved Play Keepalive SB 0x0F")
-				if GetLimbo() {
+				if MainProxy.GetLimbo() {
 					Log.Debug("Recieved limbo keepalive")
 				}
 			}
 		}
-		if !GetLimbo() && !P.GetReconnection() && P.GetClosed() {
+		if !MainProxy.GetLimbo() && !P.GetReconnection() && P.GetClosed() {
 			P.ServerConn.Write(data[:BytesRead])
 		}
 	}
 	Log.Critical("Left loop")
+}
+
+func (P *ProxyObject) PPS() {
+	ticker := time.NewTicker(1 * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			atomic.StoreUint32(&P.PPSCount, 0)
+		case PPS := <-P.PacketPerSecondC:
+			switch PPS {
+			case 0:
+				atomic.AddUint32(&P.PPSCount, 1)
+			case 1:
+				ticker.Stop()
+				return
+			}
+		}
+	}
 }

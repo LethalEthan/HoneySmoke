@@ -6,10 +6,12 @@ import (
 )
 
 func (P *ProxyObject) Close() {
+	P.PacketPerSecondC <- 1 //closes pps routine
 	if P.ServerConn != nil {
 		P.ServerConn.Close()
 	}
 	if P.ClientConn != nil {
+		MainProxy.Delete(P.ClientConn.RemoteAddr().String())
 		P.ClientConn.Close()
 	}
 	P.SetClosed()
@@ -59,28 +61,47 @@ func (P *ProxyObject) SetReconnection(val bool) {
 	P.ReconnectionMutex.Unlock()
 }
 
-func GetLimbo() bool {
-	LimboMutex.RLock()
-	B := Limbo
-	LimboMutex.RUnlock()
+func (P *Proxy) GetLimbo() bool {
+	P.LimboMutex.RLock()
+	B := P.Limbo
+	P.LimboMutex.RUnlock()
 	return B
 }
 
-func SetLimbo(L bool) {
-	LimboMutex.Lock()
-	Limbo = L
-	LimboMutex.Unlock()
+func (P *Proxy) SetLimbo(L bool) {
+	P.LimboMutex.Lock()
+	P.Limbo = L
+	P.LimboMutex.Unlock()
 }
 
-func GetListener() net.Listener {
-	ListenerMutex.Lock()
-	L := Listener
-	ListenerMutex.Unlock()
+func (P *Proxy) GetListener() net.Listener {
+	P.ListenerMutex.Lock()
+	L := P.Listener
+	P.ListenerMutex.Unlock()
 	return L
 }
 
-func SetListener(val net.Listener) {
-	ListenerMutex.Lock()
-	Listener = val
-	ListenerMutex.Unlock()
+func (P *Proxy) SetListener(val net.Listener) {
+	P.ListenerMutex.Lock()
+	P.Listener = val
+	P.ListenerMutex.Unlock()
+}
+
+func (P *Proxy) Delete(key string) {
+	if _, i := P.ProxyObjects[key]; i {
+		delete(P.ProxyObjects, key)
+	}
+}
+
+func (P *Proxy) Set(key string, val ProxyObject) {
+	P.ProxyObjectsMutex.Lock()
+	P.ProxyObjects[key] = val
+	P.ProxyObjectsMutex.Unlock()
+}
+
+func (P *Proxy) Get(key string) ProxyObject {
+	P.ProxyObjectsMutex.RLock()
+	PO := P.ProxyObjects[key]
+	P.ProxyObjectsMutex.RUnlock()
+	return PO
 }
