@@ -41,7 +41,7 @@ func CreatePacketWriterWithCapacity(PacketID int32, Capacity int) PacketWriter {
 func (pw *PacketWriter) GetCompressedPacket() []byte { //Finish this
 	pw.packetSize = len(pw.data) //Set packet length
 	if pw.packetSize < 256 {
-		p := append(pw.CreateVarInt(uint32(pw.packetSize+1)), 0x00)
+		p := append(CreateVarInt(uint32(pw.packetSize+1)), 0x00)
 		p = append(p, pw.data...)
 		return p
 	} else {
@@ -63,7 +63,7 @@ func (pw *PacketWriter) ResetData(packetID int32) {
 func (pw *PacketWriter) GetPacket() []byte {
 	pw.packetSize = len(pw.data)
 	//pw.data = append(pw.CreateVarInt(uint32(pw.packetID)), pw.data...)
-	p := append(pw.CreateVarInt(uint32(pw.packetSize)), pw.data...)
+	p := append(CreateVarInt(uint32(pw.packetSize)), pw.data...)
 	// Log.Debug("PacketSize: ", len(pw.data))
 	// Log.Debug("Packet Contents: ", pw.data)
 	return p
@@ -175,16 +175,16 @@ func (pw *PacketWriter) WriteArrayIdentifier(val []Identifier) {
 
 //WriteVarInt - Write VarInt to packet (int32)
 func (pw *PacketWriter) WriteVarInt(val int32) {
-	pw.AppendByteSlice(pw.CreateVarInt(uint32(val)))
+	pw.AppendByteSlice(CreateVarInt(uint32(val)))
 }
 
 //WriteVarLong - Write VarLong (int64)
 func (pw *PacketWriter) WriteVarLong(val int64) {
-	pw.AppendByteSlice(pw.CreateVarLong(uint64(val)))
+	pw.AppendByteSlice(CreateVarLong(uint64(val)))
 }
 
 //CreateVarLong - Creates a VarLong, requires uint to move the sign bit
-func (pw *PacketWriter) CreateVarLong(val uint64) []byte {
+func CreateVarLong(val uint64) []byte {
 	var buff = make([]byte, 0, 10)
 	for {
 		temp := byte(val & 0x7F)
@@ -201,7 +201,7 @@ func (pw *PacketWriter) CreateVarLong(val uint64) []byte {
 }
 
 //CreateVarInt - creates VarInt, requires uint to move the sign bit
-func (pw *PacketWriter) CreateVarInt(val uint32) []byte {
+func CreateVarInt(val uint32) []byte {
 	var buff = make([]byte, 0, 5)
 	var tmp byte
 	for {

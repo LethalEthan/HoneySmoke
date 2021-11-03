@@ -118,11 +118,11 @@ func (P *ProxyObject) HandleBackEnd() {
 			}
 		}
 		err = nil
-		if len(PR.data) > 2097152 {
-			Log.Critical("Packet size is greater than 2097152!")
-			P.Close()
-			return
-		}
+		// if len(PR.data) > 2097152 {
+		// 	Log.Critical("Packet size is greater than 2097152!")
+		// 	P.Close()
+		// 	return
+		// }
 		switch P.GetState() {
 		case STATUS:
 			switch PacketID {

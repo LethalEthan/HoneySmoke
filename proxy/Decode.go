@@ -49,11 +49,13 @@ func (P *ProxyObject) HandlePacketHeader(conn net.Conn, PR *PacketReader) (int32
 			//New zlib reader
 			ZlibReader, err := zlib.NewReader(ByteReader)
 			if err != nil {
+				Log.Debug("ZLR ", err)
 				return 0, 0, 0, err
 			}
 			//Read decompressed packet
 			DecompressedPacket, err := ioutil.ReadAll(ZlibReader)
 			if err != nil {
+				Log.Debug("DCP ", err)
 				return 0, 0, 0, err
 			}
 			//Close ZlibReader
