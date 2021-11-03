@@ -17,36 +17,36 @@ type Proxy struct {
 	Listener          net.Listener
 	ListenerMutex     sync.Mutex
 	Limbo             bool
-	LimboMutex        sync.RWMutex
 	ProxyObjects      map[string]ProxyObject
 	ProxyObjectsMutex sync.RWMutex
+	LimboMutex        sync.RWMutex
 }
 
 type ProxyObject struct {
 	ClientConn        net.Conn
 	ServerConn        net.Conn
 	Closed            bool
-	CloseMutex        sync.RWMutex
-	State             uint32
-	ProtocolVersion   int32
-	ServerAddress     string
-	Compression       int32
-	Player            PlayerObject
 	Reconnection      bool
+	CloseMutex        sync.RWMutex
 	ReconnectionMutex sync.Mutex
-	PacketPerSecondC  chan byte
 	PPSCount          uint32
+	State             uint32
+	Compression       int32
+	ProtocolVersion   int32
+	Player            PlayerObject
+	ServerAddress     string
+	PacketPerSecondC  chan byte
 }
 
 type PlayerObject struct {
 	UUID                 uuid.UUID
+	ChatMode             int32 //Could've been a byte
+	MainHand             int32 //Why is this varint
 	Name                 string
 	Locale               string
-	ViewDistance         int8
-	ChatMode             int32 //Could've been a byte
-	ChatColours          bool
 	DisplayedSkinParts   byte
-	MainHand             int32 //Why is this varint
+	ViewDistance         int8
+	ChatColours          bool
 	DisableTextFiltering bool
 	Authenticated        bool
 }
@@ -63,11 +63,11 @@ const (
 	PLAY      = 3
 )
 
-func CreateProxyListener(IP string, Port string) *Proxy {
+func CreateProxyListener(Host string) *Proxy {
 	MainProxy = *new(Proxy)
 	MainProxy.ProxyObjects = make(map[string]ProxyObject)
 	if MainProxy.GetListener() == nil {
-		L, err := net.Listen("tcp", IP+Port)
+		L, err := net.Listen("tcp", Host)
 		if err != nil {
 			panic(err)
 		}
@@ -92,7 +92,8 @@ func (P *Proxy) ProxyListener() {
 			PO.ClientConn = ClientConn
 			PO.Closed = false
 			PO.PacketPerSecondC = make(chan byte, 10)
-			P.ProxyObjects[ClientConn.RemoteAddr().String()] = *PO
+			P.Set(ClientConn.RemoteAddr().String(), *PO)
+			//P.ProxyObjects[ClientConn.RemoteAddr().String()] = *PO
 			go PO.ProxyBackEnd()
 		}
 	}

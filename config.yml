@@ -1,6 +1,5 @@
 proxy-server:
-  host: "127.0.0.1"
-  port: ":25565"
+  host: "127.0.0.1:25565"
   debug: false
   timeout: 15 #Doesn't do anything rn
   protocol:
@@ -12,9 +11,8 @@ backends:
 performance: #Change me!
    cpu: 0 #0 = all cores
    gc-percent: 100
-   check-server-per-tick: 20 #TBD
    packets-per-second: 200
    movement-checks: false #TBD
-   limbo-mode-when-backend-down: false #TBD - currently is on all time
+   limbo-mode-when-backend-down: false #Keep clients connected until backed recovers
    check-server-seconds: 1 #Change this one for connecting to the backend server
    listeners: 4

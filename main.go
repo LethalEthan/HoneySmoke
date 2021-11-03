@@ -27,14 +27,14 @@ func main() {
 	B1Format := logging.NewBackendFormatter(B1, format) //Set Format
 	B1LF := logging.AddModuleLevel(B1Format)            //Add formatting Levels
 	_ = config.ConfigStart()
-	if config.GConfig.ProxyServer.DEBUG {
+	if config.GConfig.Proxy.DEBUG {
 		B1LF.SetLevel(logging.DEBUG, "")
 	} else {
 		B1LF.SetLevel(logging.INFO, "")
 	}
 	logging.SetBackend(B1LF)
 	//Logger Creation END
-	Log.Info("HoneySmoke", "0.0.0.2", "starting...")
+	Log.Info("HoneySmoke", "0.0.0.3", "starting...")
 	Log.Warning("HoneySmoke is in alpha! It is not complete and has many left overs and debugging statements left!")
 	Log.Warning("Please report any bugs, unexpected behaviour and potential features you would like")
 	if config.GConfig.Performance.CPU <= 0 {
@@ -71,7 +71,10 @@ func main() {
 	go console.Console()
 	proxy.Keys()
 	//go proxy.CheckForLimbo()
-	P := proxy.CreateProxyListener(config.GConfig.ProxyServer.IP, config.GConfig.ProxyServer.Port)
+	if config.GConfig.Proxy.Host == "" {
+		panic("Host is undefined in config!")
+	}
+	P := proxy.CreateProxyListener(config.GConfig.Proxy.Host)
 	for i := 0; i < config.GConfig.Performance.Listeners-1; i++ {
 		go P.ProxyListener()
 	}

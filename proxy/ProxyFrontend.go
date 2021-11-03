@@ -7,11 +7,10 @@ import (
 )
 
 func (P *ProxyObject) HandleFrontEnd() {
-	var data = make([]byte, 2097152) //Create buffer to store packet contents in
+	//var data = make([]byte, 2097152) //Create buffer to store packet contents in
+	//var RSD []byte
 	var err error
-	var BytesRead int
 	var PacketID int32
-	var RSD []byte
 	var PPS uint32
 	PR := CreatePacketReader([]byte{0x00})
 	Log.Debug("Started Client Handle")
@@ -23,11 +22,12 @@ func (P *ProxyObject) HandleFrontEnd() {
 		if P.GetClosed() && P.ClientConn != nil {
 			PPS = atomic.LoadUint32(&P.PPSCount)
 			if PPS > config.GConfig.Performance.PacketsPerSecond {
-				Log.Debug("PPS is greater than 10!")
+				Log.Info("PPS is greater than: ", config.GConfig.Performance.PacketsPerSecond)
 			}
-			BytesRead, err = P.ClientConn.Read(data)
+			//BytesRead, err = P.ClientConn.Read(data)
+			_, _, PacketID, err = P.HandlePacketHeader(P.ClientConn, &PR)
 			if err != nil {
-				Log.Warning("Closing Client")
+				Log.Info("Closing Client")
 				Log.Debug("Closing Client reason: ", err)
 				P.Close()
 				return
@@ -37,7 +37,7 @@ func (P *ProxyObject) HandleFrontEnd() {
 			P.Close()
 			return
 		}
-		if BytesRead <= 0 {
+		if len(PR.GetData()) <= 0 {
 			Log.Critical("Closing because bytes read is 0!")
 			P.Close()
 			return
@@ -45,36 +45,30 @@ func (P *ProxyObject) HandleFrontEnd() {
 		go func(P *ProxyObject) {
 			P.PacketPerSecondC <- 0
 		}(P)
-		PR.SetData(data[:BytesRead])
-		_, _, PacketID, RSD, err = P.HandlePacketHeader(PR)
-		if err != nil {
-			panic(err)
-		}
-		PR.SetData(RSD)
 		switch P.GetState() {
 		case HANDSHAKE:
 			switch PacketID {
 			case 0x00:
 				if P.ProtocolVersion, _, err = PR.ReadVarInt(); err != nil {
-					Log.Error(err)
+					Log.Errorf("PVERR: %d", err)
 					P.Close()
 					return
 				}
 				Log.Debug("PV: ", P.ProtocolVersion)
 				if P.ServerAddress, err = PR.ReadString(); err != nil {
-					Log.Error(err)
+					Log.Errorf("SAERR: %d", err)
 					P.Close()
 					return
 				}
 				_, err := PR.ReadUnsignedShort()
 				if err != nil {
-					Log.Error(err)
+					Log.Errorf("SPERR: %d", err)
 					P.Close()
 					return
 				}
 				NextState, _, err := PR.ReadVarInt()
 				if err != nil || NextState > 2 || NextState < 1 {
-					Log.Error(err)
+					Log.Errorf("NSERR: %d", err)
 					P.Close()
 					return
 				}
@@ -93,10 +87,7 @@ func (P *ProxyObject) HandleFrontEnd() {
 		case LOGIN:
 			switch PacketID {
 			case 0x00:
-				P.Player.Name, err = PR.ReadString()
-				if err != nil {
-					panic(err)
-				}
+				Log.Debug("Login Disconnect")
 			case 0x01:
 				Log.Debug("Recieved Encrypion Response")
 			case 0x02:
@@ -106,7 +97,7 @@ func (P *ProxyObject) HandleFrontEnd() {
 			switch PacketID {
 			case 0x00:
 				Log.Debug("Recieved Status 0x00 SB")
-				P.ClientConn.Write(data[:BytesRead]) //PR.Data)
+				P.ClientConn.Write(PR.GetData()) //PR.Data)
 				P.Close()
 				return
 			case 0x01:
@@ -114,17 +105,16 @@ func (P *ProxyObject) HandleFrontEnd() {
 			}
 		case PLAY:
 			switch PacketID {
-			case 0x1A:
-				Log.Critical("Disconnect Play receieved, ignoring")
-				MainProxy.SetLimbo(true)
 			case 0x05:
-				P.Player.Locale, _ = PR.ReadString()
-				P.Player.ViewDistance, _ = PR.ReadByte()
-				P.Player.ChatMode, _, _ = PR.ReadVarInt()
-				P.Player.ChatColours, _ = PR.ReadBoolean()
-				P.Player.DisplayedSkinParts, _ = PR.ReadUnsignedByte()
-				P.Player.MainHand, _, _ = PR.ReadVarInt()
-				P.Player.DisableTextFiltering, _ = PR.ReadBoolean()
+				if P.ProtocolVersion > 750 {
+					P.Player.Locale, _ = PR.ReadString()
+					P.Player.ViewDistance, _ = PR.ReadByte()
+					P.Player.ChatMode, _, _ = PR.ReadVarInt()
+					P.Player.ChatColours, _ = PR.ReadBoolean()
+					P.Player.DisplayedSkinParts, _ = PR.ReadUnsignedByte()
+					P.Player.MainHand, _, _ = PR.ReadVarInt()
+					P.Player.DisableTextFiltering, _ = PR.ReadBoolean()
+				}
 			case 0x0F:
 				Log.Debug("Recieved Play Keepalive SB 0x0F")
 				if MainProxy.GetLimbo() {
@@ -133,7 +123,7 @@ func (P *ProxyObject) HandleFrontEnd() {
 			}
 		}
 		if !MainProxy.GetLimbo() && !P.GetReconnection() && P.GetClosed() {
-			P.ServerConn.Write(data[:BytesRead])
+			P.ServerConn.Write(PR.GetData())
 		}
 	}
 	Log.Critical("Left loop")

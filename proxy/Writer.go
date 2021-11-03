@@ -15,8 +15,8 @@ type PacketWriter struct {
 
 type Identifier string
 
-func CreatePacketWriter(PacketID int32) *PacketWriter {
-	pw := new(PacketWriter)        //new packet with data struct Above
+func CreatePacketWriter(PacketID int32) PacketWriter {
+	pw := *new(PacketWriter)       //new packet with data struct Above
 	pw.packetID = PacketID         //PacketID passed via function arguments
 	pw.data = make([]byte, 0, 128) //Data is created with a byte array
 	pw.WriteVarInt(PacketID)       //write PacketID to packet
@@ -25,8 +25,8 @@ func CreatePacketWriter(PacketID int32) *PacketWriter {
 
 /*CreatePacketWriterWithCapacity - Create a packet writer with capacity on the data slice
 max 2097151 if over it will default to a capacity of 128*/
-func CreatePacketWriterWithCapacity(PacketID int32, Capacity int) *PacketWriter {
-	pw := new(PacketWriter)
+func CreatePacketWriterWithCapacity(PacketID int32, Capacity int) PacketWriter {
+	pw := *new(PacketWriter)
 	pw.packetID = PacketID
 	if Capacity > 0 && Capacity < 2097151 {
 		pw.data = make([]byte, 0, Capacity)

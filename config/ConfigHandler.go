@@ -18,9 +18,8 @@ var (
 
 // Config struct for HoneyBEE config
 type Config struct {
-	ProxyServer struct {
-		IP       string `yaml:"ip"`      //IP Address to bind the Server
-		Port     string `yaml:"port"`    //TCP Port to bind the Server to
+	Proxy struct {
+		Host     string `yaml:"host"`    //IP Address to bind the Server
 		DEBUG    bool   `yaml:"debug"`   //Output DEBUG info -- TBD
 		Timeout  int    `yaml:"timeout"` // Server timeout to use until a connection is destroyed when unresponsive (in seconds)
 		Protocol struct {
@@ -34,9 +33,8 @@ type Config struct {
 	Performance struct {
 		CPU                       int    `yaml:"cpu"`
 		GCPercent                 int    `yaml:"gc-percent"`
-		CheckServerOnlineTick     int    `yaml:"check-server-per-tick"` //How many ticks should go before a status check is initiated
-		PacketsPerSecond          uint32 `yaml:"packets-per-second"`    //TBD
-		ApplyStrictMovementChecks bool   `yaml:"movement-checks"`       //TBD
+		PacketsPerSecond          uint32 `yaml:"packets-per-second"` //TBD
+		ApplyStrictMovementChecks bool   `yaml:"movement-checks"`    //TBD
 		LimboMode                 bool   `yaml:"limbo-mode-when-backend-down"`
 		CheckServerSeconds        int    `yaml:"check-server-seconds"`
 		Listeners                 int    `yaml:"listeners"`

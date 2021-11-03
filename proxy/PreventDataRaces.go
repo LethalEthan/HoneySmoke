@@ -6,7 +6,10 @@ import (
 )
 
 func (P *ProxyObject) Close() {
-	P.PacketPerSecondC <- 1 //closes pps routine
+	P.CloseMutex.Lock()
+	if P.PacketPerSecondC != nil {
+		P.PacketPerSecondC <- 1 //closes pps routine
+	}
 	if P.ServerConn != nil {
 		P.ServerConn.Close()
 	}
@@ -14,6 +17,7 @@ func (P *ProxyObject) Close() {
 		MainProxy.Delete(P.ClientConn.RemoteAddr().String())
 		P.ClientConn.Close()
 	}
+	P.CloseMutex.Unlock()
 	P.SetClosed()
 }
 
@@ -88,9 +92,11 @@ func (P *Proxy) SetListener(val net.Listener) {
 }
 
 func (P *Proxy) Delete(key string) {
+	P.ProxyObjectsMutex.Lock()
 	if _, i := P.ProxyObjects[key]; i {
 		delete(P.ProxyObjects, key)
 	}
+	P.ProxyObjectsMutex.Unlock()
 }
 
 func (P *Proxy) Set(key string, val ProxyObject) {

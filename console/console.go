@@ -116,7 +116,7 @@ func Shutdown() {
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 	<-shutdown
 	Log.Warning("Starting shutdown")
-	if config.GConfig.ProxyServer.DEBUG {
+	if config.GConfig.Proxy.DEBUG {
 		PrintDebugStats()
 	}
 	//fmt.Println(proxy.ProxyObjects)
