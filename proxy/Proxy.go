@@ -1,9 +1,11 @@
 package proxy
 
 import (
+	"HoneySmoke/config"
 	"net"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/op/go-logging"
@@ -93,30 +95,24 @@ func (P *Proxy) ProxyListener() {
 			PO.Closed = false
 			PO.PacketPerSecondC = make(chan byte, 10)
 			P.Set(ClientConn.RemoteAddr().String(), *PO)
-			//P.ProxyObjects[ClientConn.RemoteAddr().String()] = *PO
-			go PO.ProxyBackEnd()
+			go PO.StartHandles()
 		}
 	}
 }
 
-// func CheckForLimbo() {
-// 	if config.GConfig.Performance.LimboMode {
-// 		var err error
-// 		var S net.Conn
-// 		Log.Debug("LIMBO CHECK ACTIVE!")
-// 		ticks := time.Duration(config.GConfig.Performance.CheckServerOnlineTick * 50)
-// 		ticker := time.NewTicker(ticks * time.Millisecond) //time.Tick(ticks * time.Millisecond)
-// 		defer ticker.Stop()
-// 		for {
-// 			<-ticker.C
-// 			S, err = net.Dial("tcp", config.GConfig.Backends.Servers[0])
-// 			if err != nil {
-// 				SetLimbo(true)
-// 				<-ticker.C
-// 			} else {
-// 				SetLimbo(false)
-// 			}
-// 			S.Close()
-// 		}
-// 	}
-// }
+func (P *ProxyObject) StartHandles() {
+	var err error
+	for {
+		P.ServerConn, err = net.Dial("tcp", config.GConfig.Backends.Servers[0])
+		if err == nil {
+			Log.Debug("Connected handling...")
+			break
+		} else {
+			Log.Critical("Error dialing, waiting", config.GConfig.Performance.CheckServerSeconds, "seconds until retry")
+			err = nil //reset err otherwise it could just loop
+		}
+		time.Sleep(time.Duration(config.GConfig.Performance.CheckServerSeconds) * time.Second)
+	}
+	go P.HandleFrontEnd()
+	go P.HandleBackEnd()
+}

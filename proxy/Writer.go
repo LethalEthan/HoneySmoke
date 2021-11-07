@@ -62,10 +62,7 @@ func (pw *PacketWriter) ResetData(packetID int32) {
 
 func (pw *PacketWriter) GetPacket() []byte {
 	pw.packetSize = len(pw.data)
-	//pw.data = append(pw.CreateVarInt(uint32(pw.packetID)), pw.data...)
 	p := append(CreateVarInt(uint32(pw.packetSize)), pw.data...)
-	// Log.Debug("PacketSize: ", len(pw.data))
-	// Log.Debug("Packet Contents: ", pw.data)
 	return p
 }
 
@@ -79,7 +76,6 @@ func (pw *PacketWriter) GetPacketSize() int {
 
 func (pw *PacketWriter) AppendByteSlice(Data []byte) {
 	pw.data = append(pw.data, Data...)
-
 	pw.packetSize += len(Data)
 }
 
@@ -183,6 +179,32 @@ func (pw *PacketWriter) WriteVarLong(val int64) {
 	pw.AppendByteSlice(CreateVarLong(uint64(val)))
 }
 
+//CreateVarInt - creates VarInt, requires uint to move the sign bit
+func CreateVarInt(val uint32) []byte {
+	if val > 0 && val < 128 { // values 0-127 are the same and are not encoded in any special way so we skip the logic
+		return []byte{byte(val)}
+	} else {
+		var buff = make([]byte, 0, 5)
+		var tmp byte
+		for {
+			tmp = byte(val & 0x7F)
+			val = val >> 7
+			if val != 0 {
+				tmp |= 0x80
+			}
+			buff = append(buff, tmp)
+			if val == 0 {
+				break
+			}
+			if len(buff) >= 5 {
+				Log.Critical("Buff over 5!")
+				break
+			}
+		}
+		return buff
+	}
+}
+
 //CreateVarLong - Creates a VarLong, requires uint to move the sign bit
 func CreateVarLong(val uint64) []byte {
 	var buff = make([]byte, 0, 10)
@@ -194,28 +216,6 @@ func CreateVarLong(val uint64) []byte {
 		}
 		buff = append(buff, temp)
 		if val == 0 {
-			break
-		}
-	}
-	return buff
-}
-
-//CreateVarInt - creates VarInt, requires uint to move the sign bit
-func CreateVarInt(val uint32) []byte {
-	var buff = make([]byte, 0, 5)
-	var tmp byte
-	for {
-		tmp = byte(val & 0x7F)
-		val = val >> 7
-		if val != 0 {
-			tmp |= 0x80
-		}
-		buff = append(buff, tmp)
-		if val == 0 {
-			break
-		}
-		if len(buff) >= 5 {
-			Log.Critical("Buff over 5!")
 			break
 		}
 	}

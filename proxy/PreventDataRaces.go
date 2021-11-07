@@ -93,9 +93,7 @@ func (P *Proxy) SetListener(val net.Listener) {
 
 func (P *Proxy) Delete(key string) {
 	P.ProxyObjectsMutex.Lock()
-	if _, i := P.ProxyObjects[key]; i {
-		delete(P.ProxyObjects, key)
-	}
+	delete(P.ProxyObjects, key)
 	P.ProxyObjectsMutex.Unlock()
 }
 

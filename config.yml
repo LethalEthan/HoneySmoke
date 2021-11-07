@@ -5,7 +5,7 @@ proxy-server:
   protocol:
     AvailableProtocols: [] #Doesn't do anything rn
 backends:
-  servers: ["127.0.0.1:25567"] #First server in list is the one that it will connect to first
+  servers: ["192.168.88.56:25565","127.0.0.1:25567"] #First server in list is the one that it will connect to first //,"127.0.0.1:25567"
   load-balancing-servers: [] #Enter the array number in the list above that you want to load balance
   load-balancing-type: "none" #
 performance: #Change me!

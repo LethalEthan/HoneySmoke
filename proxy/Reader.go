@@ -50,6 +50,10 @@ func (pr *PacketReader) SeekTo(pos int) bool {
 	return true
 }
 
+func (pr *PacketReader) GetSeek() int {
+	return pr.seeker
+}
+
 //CheckForEOF
 func (pr *PacketReader) CheckForEOF() bool {
 	return pr.seeker >= pr.end
@@ -200,7 +204,7 @@ func (pr *PacketReader) ReadString() (string, error) {
 		return "", errors.New("error on begin start string")
 	}
 	//Read string size
-	StringSize, _, err := pr.ReadVarInt()
+	StringSize, err := pr.ReadVarInt()
 	if err != nil {
 		return "", err
 	}
@@ -227,7 +231,7 @@ func (pr *PacketReader) ReadString() (string, error) {
 	return StringVal, nil
 }
 
-func (pr *PacketReader) ReadVarInt() (int32, byte, error) {
+func (pr *PacketReader) ReadVarInt() (int32, error) {
 	var Result uint32
 	var val uint32
 	var NumRead byte
@@ -235,7 +239,7 @@ func (pr *PacketReader) ReadVarInt() (int32, byte, error) {
 	var err error
 	Byte, err = pr.ReadUnsignedByte()
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
 	for {
 		val = uint32((Byte & 0x7F))
@@ -244,7 +248,7 @@ func (pr *PacketReader) ReadVarInt() (int32, byte, error) {
 		NumRead++
 		//Size check
 		if NumRead > 5 {
-			return 0, 0, fmt.Errorf("varint was over five bytes without termination")
+			return 0, fmt.Errorf("varint was over five bytes without termination")
 		}
 		//Termination
 		if Byte&0x80 == 0 {
@@ -252,10 +256,10 @@ func (pr *PacketReader) ReadVarInt() (int32, byte, error) {
 		}
 		Byte, err = pr.ReadUnsignedByte()
 		if err != nil {
-			return 0, 0, err //int32(Result), NumRead, err
+			return 0, err //int32(Result), NumRead, err
 		}
 	}
-	return int32(Result), NumRead, nil
+	return int32(Result), nil
 }
 
 func (pr *PacketReader) ReadVarLong() (int64, error) {

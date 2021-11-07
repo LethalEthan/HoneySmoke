@@ -34,7 +34,8 @@ func main() {
 	}
 	logging.SetBackend(B1LF)
 	//Logger Creation END
-	Log.Info("HoneySmoke", "0.0.0.3", "starting...")
+	Log.Info("HoneySmoke", "0.0.0.4", "starting...")
+	Log.Critical("Limbo mode is not available for HoneySmoke 0.0.0.4! due to instability and not enough testing (network re-written)")
 	Log.Warning("HoneySmoke is in alpha! It is not complete and has many left overs and debugging statements left!")
 	Log.Warning("Please report any bugs, unexpected behaviour and potential features you would like")
 	if config.GConfig.Performance.CPU <= 0 {
