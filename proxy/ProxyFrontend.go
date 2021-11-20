@@ -1,7 +1,9 @@
 package proxy
 
 import (
+	"HoneySmoke/config"
 	"bufio"
+	"strings"
 )
 
 func (P *ProxyObject) HandleFrontEnd() {
@@ -19,6 +21,7 @@ func (P *ProxyObject) HandleFrontEnd() {
 			P.Close()
 			return
 		}
+		Log.Debugf("FE: %x, S: %d", PacketID, P.GetState())
 		switch P.State {
 		case HANDSHAKE:
 			switch PacketID {
@@ -34,7 +37,7 @@ func (P *ProxyObject) HandleFrontEnd() {
 					P.Close()
 					return
 				}
-				_, err := PR.ReadUnsignedShort()
+				Port, err := PR.ReadUShort()
 				if err != nil {
 					Log.Errorf("SPERR: %d", err)
 					P.Close()
@@ -46,6 +49,12 @@ func (P *ProxyObject) HandleFrontEnd() {
 					P.Close()
 					return
 				}
+				PW := CreatePacketWriter(0x00)
+				PW.WriteVarInt(P.ProtocolVersion)
+				PW.WriteString(strings.Split(config.GConfig.Backends.Servers[0], ":")[0])
+				PW.WriteUShort(Port)
+				PW.WriteVarInt(NextState)
+				OriginalData = PW.GetPacket() //Overwrite original handshake
 				P.SetState(uint32(NextState))
 			}
 		case STATUS:
@@ -65,7 +74,7 @@ func (P *ProxyObject) HandleFrontEnd() {
 					P.Player.ViewDistance, _ = PR.ReadByte()
 					P.Player.ChatMode, _ = PR.ReadVarInt()
 					P.Player.ChatColours, _ = PR.ReadBoolean()
-					P.Player.DisplayedSkinParts, _ = PR.ReadUnsignedByte()
+					P.Player.DisplayedSkinParts, _ = PR.ReadUByte()
 					P.Player.MainHand, _ = PR.ReadVarInt()
 					P.Player.DisableTextFiltering, _ = PR.ReadBoolean()
 				}

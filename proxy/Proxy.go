@@ -4,6 +4,8 @@ import (
 	"HoneySmoke/config"
 	"net"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,11 +17,11 @@ import (
 
 type Proxy struct {
 	IP                string
-	Port              string
+	Port              uint16
+	Limbo             bool
 	Listener          net.Listener
 	ListenerMutex     sync.Mutex
-	Limbo             bool
-	ProxyObjects      map[string]ProxyObject
+	ProxyObjects      map[string]*ProxyObject
 	ProxyObjectsMutex sync.RWMutex
 	LimboMutex        sync.RWMutex
 }
@@ -27,25 +29,25 @@ type Proxy struct {
 type ProxyObject struct {
 	ClientConn        net.Conn
 	ServerConn        net.Conn
-	Closed            bool
-	Reconnection      bool
 	CloseMutex        sync.RWMutex
 	ReconnectionMutex sync.Mutex
+	Player            PlayerObject
 	PPSCount          uint32
 	State             uint32
 	Compression       int32
 	ProtocolVersion   int32
-	Player            PlayerObject
 	ServerAddress     string
+	Closed            bool
+	Reconnection      bool
 	PacketPerSecondC  chan byte
 }
 
 type PlayerObject struct {
 	UUID                 uuid.UUID
-	ChatMode             int32 //Could've been a byte
-	MainHand             int32 //Why is this varint
 	Name                 string
 	Locale               string
+	ChatMode             int32 //Could've been a byte
+	MainHand             int32 //Why is this varint
 	DisplayedSkinParts   byte
 	ViewDistance         int8
 	ChatColours          bool
@@ -67,7 +69,10 @@ const (
 
 func CreateProxyListener(Host string) *Proxy {
 	MainProxy = *new(Proxy)
-	MainProxy.ProxyObjects = make(map[string]ProxyObject)
+	MainProxy.ProxyObjects = make(map[string]*ProxyObject)
+	MainProxy.IP = strings.Split(config.GConfig.Proxy.Host, ":")[0]
+	Port, _ := strconv.ParseUint(strings.Split(config.GConfig.Proxy.Host, ":")[1], 10, 16)
+	MainProxy.Port = uint16(Port)
 	if MainProxy.GetListener() == nil {
 		L, err := net.Listen("tcp", Host)
 		if err != nil {
@@ -94,7 +99,7 @@ func (P *Proxy) ProxyListener() {
 			PO.ClientConn = ClientConn
 			PO.Closed = false
 			PO.PacketPerSecondC = make(chan byte, 10)
-			P.Set(ClientConn.RemoteAddr().String(), *PO)
+			P.Set(ClientConn.RemoteAddr().String(), PO)
 			go PO.StartHandles()
 		}
 	}
@@ -102,17 +107,24 @@ func (P *Proxy) ProxyListener() {
 
 func (P *ProxyObject) StartHandles() {
 	var err error
-	for {
+	for i := 0; i < config.GConfig.Performance.CheckServerChances; i++ {
 		P.ServerConn, err = net.Dial("tcp", config.GConfig.Backends.Servers[0])
 		if err == nil {
 			Log.Debug("Connected handling...")
+			MainProxy.SetLimbo(false)
 			break
 		} else {
 			Log.Critical("Error dialing, waiting", config.GConfig.Performance.CheckServerSeconds, "seconds until retry")
 			err = nil //reset err otherwise it could just loop
+			MainProxy.SetLimbo(true)
 		}
 		time.Sleep(time.Duration(config.GConfig.Performance.CheckServerSeconds) * time.Second)
 	}
-	go P.HandleFrontEnd()
-	go P.HandleBackEnd()
+	if P.ServerConn != nil {
+		go P.HandleFrontEnd()
+		go P.HandleBackEnd()
+	} else {
+		P.ClientConn.Close()
+		return
+	}
 }

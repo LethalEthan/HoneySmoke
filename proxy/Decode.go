@@ -19,9 +19,10 @@ func DecodePacket(BR *bufio.Reader, P *ProxyObject) ([]byte, error) {
 		return []byte{0}, err
 	}
 	if PacketSize > 2097152 {
-		panic("Packet size too large")
+		Log.Error("Packet size too large")
+		return []byte{0}, errors.New("Packet too large")
 	}
-	Log.Debug("PacketSize: ", PacketSize)
+	//Log.Debug("PacketSize: ", PacketSize)
 	PacketSize = PacketSize + int32(len(TMP)) //add the length of varint to packetsize
 	Data := make([]byte, PacketSize)
 	copy(Data[0:], TMP) // copy bytes of packet size into buffer
@@ -31,7 +32,7 @@ func DecodePacket(BR *bufio.Reader, P *ProxyObject) ([]byte, error) {
 		Log.Debug(err)
 		return []byte{0}, err
 	}
-	if n == 0 {
+	if n <= 0 {
 		return []byte{0}, BRZ
 	}
 	return Data, nil
@@ -72,7 +73,7 @@ func DecodeVarInt(BR *bufio.Reader) (int32, []byte, error) {
 }
 
 func (P *ProxyObject) HandlePacket(PR *PacketReader) (int32, int32, error) {
-	if PR.GetSeek() != 0 {
+	if PR.GetIndex() != 0 {
 		panic("seek is not 0 when preparing to handle packet!")
 	}
 	var PacketSize int32
@@ -107,7 +108,7 @@ func (P *ProxyObject) HandlePacket(PR *PacketReader) (int32, int32, error) {
 			return PacketSize, PacketID, nil
 		} else {
 			//Read the compressed packet into byte reader
-			ByteReader := bytes.NewReader(PR.ReadRestOfByteArray())
+			ByteReader := bytes.NewReader(PR.ReadRestOfByteArrayNoSeek())
 			//New zlib reader
 			ZlibReader, err := zlib.NewReader(ByteReader)
 			if err != nil {

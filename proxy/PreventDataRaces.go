@@ -97,13 +97,13 @@ func (P *Proxy) Delete(key string) {
 	P.ProxyObjectsMutex.Unlock()
 }
 
-func (P *Proxy) Set(key string, val ProxyObject) {
+func (P *Proxy) Set(key string, val *ProxyObject) {
 	P.ProxyObjectsMutex.Lock()
 	P.ProxyObjects[key] = val
 	P.ProxyObjectsMutex.Unlock()
 }
 
-func (P *Proxy) Get(key string) ProxyObject {
+func (P *Proxy) Get(key string) *ProxyObject {
 	P.ProxyObjectsMutex.RLock()
 	PO := P.ProxyObjects[key]
 	P.ProxyObjectsMutex.RUnlock()
